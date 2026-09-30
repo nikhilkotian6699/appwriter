@@ -1,0 +1,8 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "fakegateway", "runtimeExecutable": "bash", "runtimeArgs": ["scripts/dev-fake.sh"], "port": 4000 },
+    { "name": "api", "runtimeExecutable": "bash", "runtimeArgs": ["scripts/dev-api.sh"], "port": 8080 },
+    { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--prefix", "web"], "port": 5173 }
+  ]
+}

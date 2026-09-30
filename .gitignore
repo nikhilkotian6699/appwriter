@@ -1,0 +1,17 @@
+# secrets and local env
+.env
+.env.*
+!.env.example
+
+# build output
+/bin/
+/web/dist/*
+!/web/dist/.keep
+/web/node_modules/
+/guide/node_modules/
+
+# tooling
+*.log
+.DS_Store
+coverage.out
+/tmp/

@@ -1,0 +1,703 @@
+openapi: 3.0.3
+info:
+  title: Writers' Guild API
+  version: 0.1.0
+  description: |
+    HTTP contract of the Writers' Guild. The Go server interface and the
+    TypeScript client are generated from this file. Streaming endpoints use
+    Server-Sent Events and are documented here but implemented by hand.
+servers:
+  - url: /
+security: []
+paths:
+  /api/me:
+    get:
+      operationId: getMe
+      summary: Current account and app configuration
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/settings:
+    get:
+      operationId: getSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Settings" }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SettingsInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Settings" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/gateway/models:
+    get:
+      operationId: listGatewayModels
+      summary: Aliases known to the gateway
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GatewayModels" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/projects:
+    get:
+      operationId: listProjects
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProjectSummary" }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/projects/{projectId}:
+    parameters:
+      - $ref: "#/components/parameters/projectId"
+    get:
+      operationId: getProject
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      operationId: updateProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteProject
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/projects/{projectId}/chapters:
+    parameters:
+      - $ref: "#/components/parameters/projectId"
+    get:
+      operationId: listChapters
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ChapterSummary" }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createChapter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChapterCreateInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Chapter" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/projects/{projectId}/bible:
+    parameters:
+      - $ref: "#/components/parameters/projectId"
+    get:
+      operationId: listBibleEntries
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BibleEntry" }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createBibleEntry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BibleEntryInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BibleEntry" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/bible-entries/{entryId}:
+    parameters:
+      - $ref: "#/components/parameters/entryId"
+    put:
+      operationId: updateBibleEntry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BibleEntryInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BibleEntry" }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteBibleEntry
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/chapters/{chapterId}:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+    get:
+      operationId: getChapter
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Chapter" }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      operationId: updateChapter
+      summary: Rename or move a chapter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChapterMetaInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Chapter" }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteChapter
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/chapters/{chapterId}/content:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+    put:
+      operationId: saveChapterContent
+      summary: Save the chapter text; may create an autosave snapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChapterContentInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChapterSaveResult" }
+        "409":
+          description: The chapter changed since base_hash was read
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/chapters/{chapterId}/versions:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+    get:
+      operationId: listChapterVersions
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ChapterVersionSummary" }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createChapterSnapshot
+      summary: Take a labelled snapshot by hand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SnapshotInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChapterVersion" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/chapters/{chapterId}/versions/{versionId}:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+      - $ref: "#/components/parameters/versionId"
+    get:
+      operationId: getChapterVersion
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChapterVersion" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/chapters/{chapterId}/versions/{versionId}/restore:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+      - $ref: "#/components/parameters/versionId"
+    post:
+      operationId: restoreChapterVersion
+      summary: Snapshot the current text, then replace it with the version
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Chapter" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/writers:
+    get:
+      operationId: listWriters
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Writer" }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createWriter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WriterInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Writer" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/writers/test:
+    post:
+      operationId: testWriter
+      summary: Send a short sample request through the gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WriterTestInput" }
+      responses:
+        "200":
+          description: The gateway answered or refused; see ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriterTestResult" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/writers/{writerId}:
+    parameters:
+      - $ref: "#/components/parameters/writerId"
+    get:
+      operationId: getWriter
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Writer" }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      operationId: updateWriter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WriterInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Writer" }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteWriter
+      responses:
+        "204": { description: Deleted }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/writers/{writerId}/duplicate:
+    parameters:
+      - $ref: "#/components/parameters/writerId"
+    post:
+      operationId: duplicateWriter
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Writer" }
+        default: { $ref: "#/components/responses/Error" }
+
+components:
+  parameters:
+    projectId:
+      name: projectId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    chapterId:
+      name: chapterId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    versionId:
+      name: versionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    entryId:
+      name: entryId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    writerId:
+      name: writerId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+
+    User:
+      type: object
+      required: [id, username, display_name, role, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        display_name: { type: string }
+        role: { type: string, enum: [admin, author] }
+        created_at: { type: string, format: date-time }
+
+    Me:
+      type: object
+      required: [user, app_name, default_model_alias, alias_prefix]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+        app_name: { type: string }
+        default_model_alias: { type: string }
+        alias_prefix: { type: string }
+
+    Settings:
+      type: object
+      required: [scene_token_limit, autosave_snapshot_minutes]
+      properties:
+        scene_token_limit: { type: integer }
+        autosave_snapshot_minutes: { type: integer }
+
+    SettingsInput:
+      type: object
+      required: [scene_token_limit, autosave_snapshot_minutes]
+      properties:
+        scene_token_limit: { type: integer, minimum: 500, maximum: 200000 }
+        autosave_snapshot_minutes: { type: integer, minimum: 1, maximum: 1440 }
+
+    GatewayModels:
+      type: object
+      required: [alias_prefix, aliases, all_models]
+      properties:
+        alias_prefix: { type: string }
+        aliases:
+          type: array
+          description: Models whose id starts with the alias prefix
+          items: { type: string }
+        all_models:
+          type: array
+          items: { type: string }
+
+    Project:
+      type: object
+      required: [id, name, description, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProjectSummary:
+      allOf:
+        - $ref: "#/components/schemas/Project"
+        - type: object
+          required: [chapter_count]
+          properties:
+            chapter_count: { type: integer }
+
+    ProjectInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+
+    ChapterSummary:
+      type: object
+      required: [id, project_id, title, position, content_hash, content_length, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        title: { type: string }
+        position: { type: integer }
+        content_hash: { type: string }
+        content_length: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Chapter:
+      type: object
+      required: [id, project_id, title, position, content_md, content_hash, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        title: { type: string }
+        position: { type: integer }
+        content_md: { type: string }
+        content_hash: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ChapterCreateInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 300 }
+        content_md: { type: string }
+
+    ChapterMetaInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 300 }
+        position: { type: integer }
+
+    ChapterContentInput:
+      type: object
+      required: [content_md]
+      properties:
+        content_md: { type: string }
+        base_hash:
+          type: string
+          description: Hash the client last loaded; when set and stale the save is refused with 409
+
+    ChapterSaveResult:
+      type: object
+      required: [chapter, snapshot_created]
+      properties:
+        chapter: { $ref: "#/components/schemas/Chapter" }
+        snapshot_created: { type: boolean }
+
+    ChapterVersionSummary:
+      type: object
+      required: [id, chapter_id, kind, label, content_hash, content_length, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        chapter_id: { type: string, format: uuid }
+        kind: { type: string, enum: [autosave, manual, pre_revision, pre_restore] }
+        label: { type: string }
+        content_hash: { type: string }
+        content_length: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    ChapterVersion:
+      type: object
+      required: [id, chapter_id, kind, label, content_md, content_hash, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        chapter_id: { type: string, format: uuid }
+        kind: { type: string, enum: [autosave, manual, pre_revision, pre_restore] }
+        label: { type: string }
+        content_md: { type: string }
+        content_hash: { type: string }
+        created_at: { type: string, format: date-time }
+
+    SnapshotInput:
+      type: object
+      properties:
+        label: { type: string, maxLength: 200 }
+
+    BibleSection:
+      type: string
+      enum: [premise, character, setting, timeline, style, chapter_summary]
+
+    BibleEntry:
+      type: object
+      required: [id, project_id, section, title, fields, position, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        section: { $ref: "#/components/schemas/BibleSection" }
+        title: { type: string }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+        chapter_id: { type: string, format: uuid }
+        position: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    BibleEntryInput:
+      type: object
+      required: [section, title, fields]
+      properties:
+        section: { $ref: "#/components/schemas/BibleSection" }
+        title: { type: string, maxLength: 300 }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+        chapter_id: { type: string, format: uuid }
+        position: { type: integer }
+
+    WriterRole:
+      type: string
+      enum: [critic, co-writer]
+
+    Writer:
+      type: object
+      required: [id, name, slug, model_alias, system_prompt, roles, enabled, temperature, is_system, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        model_alias: { type: string }
+        system_prompt: { type: string }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/WriterRole" }
+        enabled: { type: boolean }
+        temperature: { type: number, format: double }
+        is_system: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    WriterInput:
+      type: object
+      required: [name, system_prompt, roles, enabled, temperature]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        model_alias:
+          type: string
+          description: Defaults to "{APP_NAME}-{slug}" when empty on create
+        system_prompt: { type: string, maxLength: 20000 }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/WriterRole" }
+        enabled: { type: boolean }
+        temperature: { type: number, format: double, minimum: 0, maximum: 2 }
+
+    WriterTestInput:
+      type: object
+      required: [name, model_alias, system_prompt, temperature]
+      properties:
+        writer_id: { type: string, format: uuid }
+        name: { type: string }
+        model_alias: { type: string, minLength: 1 }
+        system_prompt: { type: string }
+        temperature: { type: number, format: double, minimum: 0, maximum: 2 }
+
+    WriterTestResult:
+      type: object
+      required: [ok, run_id, model_alias, prompt_tokens, completion_tokens, cost_known, cost_estimated, latency_ms]
+      properties:
+        ok: { type: boolean }
+        run_id: { type: string, format: uuid }
+        model_alias: { type: string }
+        reply: { type: string }
+        error: { type: string }
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        cost_usd: { type: number, format: double }
+        cost_known: { type: boolean }
+        cost_estimated: { type: boolean }
+        latency_ms: { type: integer }

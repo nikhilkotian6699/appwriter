@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: writersguild
+      POSTGRES_DB: writersguild
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U writersguild -d writersguild"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build: .
+    image: writersguild:latest
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://writersguild:${POSTGRES_PASSWORD}@db:5432/writersguild?sslmode=disable
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/writersguild", "-healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # Optional stand-in for the real gateway: `docker compose --profile fake up -d`
+  # and set LITELLM_BASE_URL=http://fakegateway:4000 in .env.
+  fakegateway:
+    image: writersguild:latest
+    profiles: ["fake"]
+    entrypoint: ["/fakegateway"]
+    environment:
+      PORT: "4000"
+      APP_NAME: ${APP_NAME:-writersguild}
+    ports:
+      - "127.0.0.1:4000:4000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
