@@ -7,8 +7,8 @@ button.
 |---|---|
 | Sign in | Username, password, **Sign in** |
 | Start a book | **Projects** → **New project** |
-| Add a chapter | Project page → **New chapter** |
-| Fill in the story bible | Project page → **Story bible** → **Add** in a section |
+| Add a chapter | Project page → type a title → **Add chapter** |
+| Fill in the story bible | Project page → **Story bible** → **Add** in a section; **Edit** beside an entry |
 | Write | Open the chapter; it saves itself |
 | Keep a version by hand | Chapter → **Versions** → label → **Snapshot** |
 | Go back to an old version | Chapter → **Versions** → **Restore** |

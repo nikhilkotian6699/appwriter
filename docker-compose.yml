@@ -44,6 +44,8 @@ services:
     environment:
       PORT: "4000"
       APP_NAME: ${APP_NAME:-writersguild}
+      # Milliseconds between streamed words; raise it to watch runs unfold slowly.
+      FAKE_DELAY_MS: ${FAKE_DELAY_MS:-12}
     ports:
       - "127.0.0.1:4000:4000"
     restart: unless-stopped

@@ -132,7 +132,12 @@ func TestIntegrationEngineCancel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-started
+	select {
+	case <-started:
+	case <-time.After(15 * time.Second):
+		row, _ := e.q.GetRun(ctx, sqlcgen.GetRunParams{ID: run.Row.ID, UserID: user.ID})
+		t.Fatalf("the workflow never started; run status %q error %q", row.Status, row.Error)
+	}
 	if !e.Cancel(run.Row.ID) {
 		t.Fatal("cancel reported the run as not active")
 	}

@@ -166,6 +166,14 @@ missing renders as a labelled placeholder so the words still read. The Docker
 image builds the guide itself; locally run `make guide` once before
 `make dev-api` if you want `/guide/` to serve.
 
+The screenshots in `guide/src/img` were taken in a browser at phone width
+(592 CSS pixels, 800 pixels wide in the image) on a workspace holding the
+guide's own sample chapter, so they stay readable in a narrow column. To
+recapture one, sign in to a test account, take the screenshot at the same
+width, save it as `guide/src/img/<name>.png`, and update the marks' `x` and
+`y` in `marks.json` (pixel positions in the image; a mark without a position
+appears in the legend only). Then `make guide`.
+
 ## Development
 
 ```bash

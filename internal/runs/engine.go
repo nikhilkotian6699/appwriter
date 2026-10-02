@@ -133,6 +133,9 @@ func (e *Engine) Launch(ctx context.Context, p StartParams, fn WorkFn) (*Run, er
 	em := &Emitter{e: e, run: run, br: ar.broker}
 	snapshot := *run
 	if err := em.Emit(base, EventRunStarted, map[string]any{"kind": run.Row.Kind}); err != nil {
+		// Without a working event store the run cannot be followed, so it
+		// ends here as failed instead of starting the workflow.
+		e.log.Error("run could not record its first event", "run", run.Row.ID, "err", err)
 		e.finish(base, run, ar, nil, err)
 		return &snapshot, nil
 	}

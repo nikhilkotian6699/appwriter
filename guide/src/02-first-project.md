@@ -19,11 +19,11 @@ You land on the project page.
 project
 ```
 
-- The **chapters** list (A) is empty for now. **New chapter** (B) adds one.
+- The **chapters** list (A) is empty for now. Type a title such as *Chapter
+  One* in the box and click **Add chapter** (B).
 - **Story bible** (C) opens the book's bible, which the next section explains.
-- Chapters can be renamed and reordered later; their order here is the order of
-  the book.
+- Chapters can be renamed and reordered later with the arrows; their order here
+  is the order of the book.
 
-Click **New chapter**, give it a title such as *Chapter One*, and open it. You
-are in the editor, which the section after next explains. First, the story
-bible.
+Add a chapter and click its title to open it. You are in the editor, which the
+section after next explains. First, the story bible.

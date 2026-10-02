@@ -24,7 +24,7 @@ The bible has six sections (A):
   shape of the whole book even when reading one chapter.
 
 To add an entry, click **Add** in a section (B), fill in the fields, and save.
-Click an entry to edit or delete it (C).
+Every entry has **Edit** and **Delete** beside it (C).
 
 After a revision, the bible keeper may propose changes to the bible, and they
 wait at the top of this page until you approve or reject them. That is

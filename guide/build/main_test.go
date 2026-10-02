@@ -113,9 +113,18 @@ func TestRenderFigureDrawsMarks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, g, b, _ := decoded.At(30+8, 40).RGBA() // inside the disc, beside the letter
-	if r>>8 < 0xE0 || g>>8 < 0x80 || b>>8 > 0x40 {
-		t.Fatalf("expected an amber disc at the mark, got %d %d %d", r>>8, g>>8, b>>8)
+	isAmber := func(px, py int) bool {
+		r, g, b, _ := decoded.At(px, py).RGBA()
+		return r>>8 >= 0xE0 && g>>8 >= 0x80 && b>>8 <= 0x40
+	}
+	if !isAmber(30+19, 40) { // on the ring
+		t.Fatal("expected an amber ring around the mark")
+	}
+	if !isAmber(30+26, 40-26-5) { // inside the badge, beside the letter
+		t.Fatal("expected an amber badge at the ring's upper right")
+	}
+	if r, _, _, _ := decoded.At(30, 40).RGBA(); r>>8 != 0xFF {
+		t.Fatal("the centre of the ring must stay untouched so the element shows")
 	}
 	if r, _, _, _ := decoded.At(110, 70).RGBA(); r>>8 != 0xFF {
 		t.Fatal("the rest of the image must stay untouched")

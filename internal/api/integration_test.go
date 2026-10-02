@@ -490,7 +490,11 @@ func TestIntegrationRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-started
+	select {
+	case <-started:
+	case <-time.After(15 * time.Second):
+		t.Fatal("the slow run never started")
+	}
 	e.want(e.do("POST", "/api/runs/"+slow.Row.ID.String()+"/cancel", nil, &got), 200, "POST", "cancel")
 	if got.Status != "cancelled" {
 		t.Fatalf("cancelled run has status %q", got.Status)

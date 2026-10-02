@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M9 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-03 (M9 built; all milestones built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -21,7 +21,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 6 | Run history, cost and writer stats, settings page | Built on 2 feature branches, awaiting merge | see branches |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Built on 4 feature branches, awaiting merge | see branches |
 | 8 | Account management: usage per user, roles, passwords, disable, delete | Built on 2 feature branches, awaiting merge | see branches |
-| 9 | In-app guide for new users | In progress (guide-content pushed; guide-screenshots next) | |
+| 9 | In-app guide for new users | Built on 2 feature branches, awaiting merge | see branches |
 
 ## Feature branches
 
@@ -54,7 +54,7 @@ branch is merged.
 | 7 | `feature/isolation-test` | login | Pushed (awaiting merge) |
 | 8 | `feature/account-usage` | users-and-account-pages | Pushed (awaiting merge) |
 | 8 | `feature/account-management` | users-and-account-pages | Pushed (awaiting merge) |
-| 9 | `feature/guide-screenshots` | everything else | Not started |
+| 9 | `feature/guide-screenshots` | everything else | Pushed (awaiting merge) |
 
 Status values: Not started · In progress · Pushed (awaiting merge) · Merged.
 
@@ -254,8 +254,23 @@ none of the stack merged when work started):
   check that nothing is fetched from other servers, and a single-file copy
   with images inlined. `make guide` / Docker build it; `guide/dist` is
   ignored by git. Unit tests incl. an end-to-end build and anchor check.
-- Next: `feature/guide-screenshots` — capture every screen, add the pixel
-  positions of the marks, rebuild.
+- `feature/guide-screenshots` is done and pushed: seventeen screenshots of
+  every screen (sign-in, projects, a project, the story bible with pending
+  proposals, the editor, writers, the Convene dialog, the Guild panel in
+  session, the editor-in-chief's list, the revision review, the Co-write
+  dialog, drafts side by side, history, stats, account, users), taken at
+  phone width on a workspace holding the guide's own sample chapter, with the
+  marks' pixel positions in `marks.json` (three marks stay legend-only where
+  the element was off-screen); `docker-compose.yml` passes `FAKE_DELAY_MS`
+  through so runs can be slowed down to photograph them. The guide now
+  renders with annotated figures; the single-file copy is about 5.6 MB.
+
+Milestone 9 is complete pending merge (order: guide-content, then
+guide-screenshots) and the live gateway check. All nine milestones are
+built. Remaining for the user: merge the 22-branch stack in order, add the
+real gateway credentials to `.env` for the live checks, and delete the
+throwaway `tester` account (it owns the screenshot fixtures; keep it if you
+want to recapture).
 
 ## Open items
 
@@ -279,5 +294,11 @@ none of the stack merged when work started):
   recreated.
 - The desktop preview runner cannot read `~/Desktop` (macOS privacy); start dev
   servers from the shell and stop them after each check.
+- Every `docker compose up --build` leaves about 1 GB of build cache in the
+  Docker VM; after six or so rebuilds the VM disk fills, the Go build fails
+  with "no space left on device" and Postgres crash-loops in recovery
+  ("could not write to file ... No space left on device"). `docker builder
+  prune -f` (plus `docker image prune -f`) frees it; volumes and running
+  containers are untouched and Postgres recovers by itself.
 - Secrets live only in the local `.env`. Never write them into the repo, a
   commit, or chat.

@@ -269,36 +269,57 @@ func renderFigure(path string, fig Figure) ([]byte, bool, error) {
 	return buf.Bytes(), true, nil
 }
 
-// drawMark paints an amber disc with a dark letter, like the marks on a
-// map, centred on (x, y).
+// drawMark highlights the target with an amber ring, so the element stays
+// readable, and hangs a small lettered badge off the ring's upper right,
+// like a callout on a map.
 func drawMark(dst *image.RGBA, x, y int, letter string) {
-	const radius = 15
-	fill := color.RGBA{R: 0xF5, G: 0x9E, B: 0x0B, A: 0xFF} // amber
-	ring := color.RGBA{R: 0x1C, G: 0x19, B: 0x17, A: 0xFF} // near-black
-	for dy := -radius - 2; dy <= radius+2; dy++ {
-		for dx := -radius - 2; dx <= radius+2; dx++ {
+	amber := color.RGBA{R: 0xF5, G: 0x9E, B: 0x0B, A: 0xFF}
+	ink := color.RGBA{R: 0x1C, G: 0x19, B: 0x17, A: 0xFF}
+	const ringR, ringW = 20, 3
+	for dy := -ringR - 1; dy <= ringR+1; dy++ {
+		for dx := -ringR - 1; dx <= ringR+1; dx++ {
 			d := dx*dx + dy*dy
 			px, py := x+dx, y+dy
 			if !(image.Point{px, py}).In(dst.Bounds()) {
 				continue
 			}
 			switch {
-			case d <= radius*radius:
-				dst.SetRGBA(px, py, fill)
-			case d <= (radius+2)*(radius+2):
-				dst.SetRGBA(px, py, ring)
+			case d >= (ringR-ringW)*(ringR-ringW) && d <= ringR*ringR:
+				dst.SetRGBA(px, py, amber)
+			case d > ringR*ringR && d <= (ringR+1)*(ringR+1):
+				dst.SetRGBA(px, py, ink)
+			case d >= (ringR-ringW-1)*(ringR-ringW-1) && d < (ringR-ringW)*(ringR-ringW):
+				dst.SetRGBA(px, py, ink)
+			}
+		}
+	}
+	// The badge: a filled disc at the ring's upper right with the letter.
+	bx, by := x+ringR+6, y-ringR-6
+	const badgeR = 13
+	for dy := -badgeR - 2; dy <= badgeR+2; dy++ {
+		for dx := -badgeR - 2; dx <= badgeR+2; dx++ {
+			d := dx*dx + dy*dy
+			px, py := bx+dx, by+dy
+			if !(image.Point{px, py}).In(dst.Bounds()) {
+				continue
+			}
+			switch {
+			case d <= badgeR*badgeR:
+				dst.SetRGBA(px, py, amber)
+			case d <= (badgeR+2)*(badgeR+2):
+				dst.SetRGBA(px, py, ink)
 			}
 		}
 	}
 	// Render the letter small, then scale it up so it stays crisp enough.
 	face := basicfont.Face7x13
 	glyph := image.NewRGBA(image.Rect(0, 0, 7, 13))
-	d := &font.Drawer{Dst: glyph, Src: image.NewUniform(ring), Face: face, Dot: fixed.P(0, 10)}
+	d := &font.Drawer{Dst: glyph, Src: image.NewUniform(ink), Face: face, Dot: fixed.P(0, 10)}
 	d.DrawString(letter)
 	const scale = 2
 	big := image.NewRGBA(image.Rect(0, 0, 7*scale, 13*scale))
 	xdraw.NearestNeighbor.Scale(big, big.Bounds(), glyph, glyph.Bounds(), draw.Over, nil)
-	target := image.Rect(x-7*scale/2, y-13*scale/2, x-7*scale/2+7*scale, y-13*scale/2+13*scale)
+	target := image.Rect(bx-7*scale/2, by-13*scale/2, bx-7*scale/2+7*scale, by-13*scale/2+13*scale)
 	draw.Draw(dst, target, big, image.Point{}, draw.Over)
 }
 

@@ -1,98 +1,453 @@
 {
-  "login": {"title": "The sign-in page", "marks": [
-    {"letter": "A", "label": "Username"},
-    {"letter": "B", "label": "Password"},
-    {"letter": "C", "label": "Sign in"}
-  ]},
-  "projects": {"title": "The Projects page", "marks": [
-    {"letter": "A", "label": "Projects in the top bar"},
-    {"letter": "B", "label": "New project"}
-  ]},
-  "project": {"title": "A project page", "marks": [
-    {"letter": "A", "label": "The chapters, in the order of the book"},
-    {"letter": "B", "label": "New chapter"},
-    {"letter": "C", "label": "Story bible"}
-  ]},
-  "bible": {"title": "The story bible", "marks": [
-    {"letter": "A", "label": "The six sections"},
-    {"letter": "B", "label": "Add an entry to a section"},
-    {"letter": "C", "label": "Click an entry to edit or delete it"}
-  ]},
-  "chapter-editor": {"title": "The chapter editor", "marks": [
-    {"letter": "A", "label": "Where you write"},
-    {"letter": "B", "label": "Toolbar, with the scene break at the end"},
-    {"letter": "C", "label": "Word count and save status"},
-    {"letter": "D", "label": "Chapter title; click to rename"},
-    {"letter": "E", "label": "Versions"},
-    {"letter": "F", "label": "Convene the Guild"},
-    {"letter": "G", "label": "Co-write"},
-    {"letter": "H", "label": "History"},
-    {"letter": "I", "label": "Guild panel on and off"}
-  ]},
-  "writers": {"title": "The Writers page", "marks": [
-    {"letter": "A", "label": "Roles: critic, co-writer or both"},
-    {"letter": "B", "label": "Enabled or disabled"},
-    {"letter": "C", "label": "Add writer"},
-    {"letter": "D", "label": "Test writer"}
-  ]},
-  "convene-dialog": {"title": "Convene the Guild", "marks": [
-    {"letter": "A", "label": "Tick the critics to convene"},
-    {"letter": "B", "label": "Convene"}
-  ]},
-  "guild-panel": {"title": "The Guild panel while the critics read", "marks": [
-    {"letter": "A", "label": "One card per critic"},
-    {"letter": "B", "label": "Issues: severity, quote, problem, fix"},
-    {"letter": "C", "label": "Story bible conflicts"},
-    {"letter": "D", "label": "Cancel the session"},
-    {"letter": "E", "label": "Click a quote to highlight it in the chapter"}
-  ]},
-  "editor-list": {"title": "The editor-in-chief's list", "marks": [
-    {"letter": "A", "label": "One merged, prioritized issue"},
-    {"letter": "B", "label": "The passage; click to highlight"},
-    {"letter": "C", "label": "Raised by: the critics behind it"},
-    {"letter": "D", "label": "Accept, Edit fix, Reject; Undo afterwards"},
-    {"letter": "E", "label": "Decisions so far"},
-    {"letter": "F", "label": "Revise"}
-  ]},
-  "revision-dialog": {"title": "Reviewing a revision", "marks": [
-    {"letter": "A", "label": "Before and after, word by word"},
-    {"letter": "B", "label": "Tick box per change"},
-    {"letter": "C", "label": "Accept all or Accept selected"},
-    {"letter": "D", "label": "Discard"}
-  ]},
-  "bible-proposals": {"title": "Story bible proposals", "marks": [
-    {"letter": "A", "label": "Approve"},
-    {"letter": "B", "label": "Edit and approve"},
-    {"letter": "C", "label": "Reject"}
-  ]},
-  "cowrite-dialog": {"title": "Asking for a draft", "marks": [
-    {"letter": "A", "label": "Pick a writer, or two or three to compare"},
-    {"letter": "B", "label": "Instruction, with common requests underneath"},
-    {"letter": "C", "label": "Scene notes"},
-    {"letter": "D", "label": "Ask for a draft"}
-  ]},
-  "drafts": {"title": "A draft in the Guild panel", "marks": [
-    {"letter": "A", "label": "The draft, in the writer's voice"},
-    {"letter": "B", "label": "Insert at cursor"},
-    {"letter": "C", "label": "Replace selection"},
-    {"letter": "D", "label": "Discard; Take back afterwards"}
-  ]},
-  "history": {"title": "A chapter's history", "marks": [
-    {"letter": "A", "label": "Totals: runs, cost, tokens"},
-    {"letter": "B", "label": "Filter by kind"},
-    {"letter": "C", "label": "One run; click for its gateway calls"}
-  ]},
-  "stats": {"title": "Writer stats", "marks": [
-    {"letter": "A", "label": "Period and project"},
-    {"letter": "B", "label": "One writer: notes cited, accepted, rate, drafts, cost"}
-  ]},
-  "account": {"title": "The Account page", "marks": [
-    {"letter": "A", "label": "Display name"},
-    {"letter": "B", "label": "Change password"}
-  ]},
-  "users": {"title": "The Users page (admins)", "marks": [
-    {"letter": "A", "label": "Period for the usage numbers"},
-    {"letter": "B", "label": "Add an account"},
-    {"letter": "C", "label": "Edit, Password, Disable or Enable, Delete"}
-  ]}
+  "login": {
+    "title": "The sign-in page",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Username",
+        "x": 600,
+        "y": 458
+      },
+      {
+        "letter": "B",
+        "label": "Password",
+        "x": 600,
+        "y": 558
+      },
+      {
+        "letter": "C",
+        "label": "Sign in",
+        "x": 560,
+        "y": 624
+      }
+    ]
+  },
+  "projects": {
+    "title": "The Projects page",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Projects in the top bar",
+        "x": 233,
+        "y": 46
+      },
+      {
+        "letter": "B",
+        "label": "New project",
+        "x": 706,
+        "y": 147
+      }
+    ]
+  },
+  "project": {
+    "title": "A project page",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "The chapters, in the order of the book",
+        "x": 222,
+        "y": 515
+      },
+      {
+        "letter": "B",
+        "label": "Add chapter, after typing a title",
+        "x": 700,
+        "y": 413
+      },
+      {
+        "letter": "C",
+        "label": "Story bible",
+        "x": 90,
+        "y": 305
+      }
+    ]
+  },
+  "bible": {
+    "title": "The story bible",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "The six sections",
+        "x": 195,
+        "y": 276
+      },
+      {
+        "letter": "B",
+        "label": "Add an entry to a section",
+        "x": 725,
+        "y": 276
+      },
+      {
+        "letter": "C",
+        "label": "Edit or delete an entry",
+        "x": 643,
+        "y": 363
+      }
+    ]
+  },
+  "chapter-editor": {
+    "title": "The chapter editor",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Where you write",
+        "x": 147,
+        "y": 648
+      },
+      {
+        "letter": "B",
+        "label": "Toolbar, with the scene break at the end",
+        "x": 400,
+        "y": 349
+      },
+      {
+        "letter": "C",
+        "label": "Word count and save status",
+        "x": 110,
+        "y": 251
+      },
+      {
+        "letter": "D",
+        "label": "Chapter title; click to rename",
+        "x": 400,
+        "y": 185
+      },
+      {
+        "letter": "E",
+        "label": "Versions",
+        "x": 247,
+        "y": 251
+      },
+      {
+        "letter": "F",
+        "label": "Convene the Guild",
+        "x": 695,
+        "y": 251
+      },
+      {
+        "letter": "G",
+        "label": "Co-write",
+        "x": 548,
+        "y": 251
+      },
+      {
+        "letter": "H",
+        "label": "History",
+        "x": 354,
+        "y": 251
+      },
+      {
+        "letter": "I",
+        "label": "Guild panel on and off",
+        "x": 449,
+        "y": 251
+      }
+    ]
+  },
+  "writers": {
+    "title": "The Writers page",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Roles: critic, co-writer or both",
+        "x": 72,
+        "y": 424
+      },
+      {
+        "letter": "B",
+        "label": "Enabled or disabled",
+        "x": 677,
+        "y": 354
+      },
+      {
+        "letter": "C",
+        "label": "Add writer",
+        "x": 87,
+        "y": 266
+      },
+      {
+        "letter": "D",
+        "label": "Test writer",
+        "x": 167,
+        "y": 564
+      }
+    ]
+  },
+  "convene-dialog": {
+    "title": "Convene the Guild",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Tick the critics to convene",
+        "x": 109,
+        "y": 285
+      },
+      {
+        "letter": "B",
+        "label": "Convene",
+        "x": 623,
+        "y": 599
+      }
+    ]
+  },
+  "guild-panel": {
+    "title": "The Guild panel while the critics read",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "One card per critic",
+        "x": 400,
+        "y": 551
+      },
+      {
+        "letter": "B",
+        "label": "Issues: severity, quote, problem, fix",
+        "x": 400,
+        "y": 752
+      },
+      {
+        "letter": "C",
+        "label": "Story bible conflicts"
+      },
+      {
+        "letter": "D",
+        "label": "Cancel the session",
+        "x": 737,
+        "y": 105
+      },
+      {
+        "letter": "E",
+        "label": "Click a quote to highlight it in the chapter",
+        "x": 430,
+        "y": 691
+      }
+    ]
+  },
+  "editor-list": {
+    "title": "The editor-in-chief's list",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "One merged, prioritized issue",
+        "x": 400,
+        "y": 677
+      },
+      {
+        "letter": "B",
+        "label": "The passage; click to highlight",
+        "x": 430,
+        "y": 589
+      },
+      {
+        "letter": "C",
+        "label": "Raised by: the critics behind it",
+        "x": 400,
+        "y": 719
+      },
+      {
+        "letter": "D",
+        "label": "Accept, Edit fix, Reject; Undo afterwards",
+        "x": 92,
+        "y": 761
+      },
+      {
+        "letter": "E",
+        "label": "Decisions so far",
+        "x": 173,
+        "y": 537
+      },
+      {
+        "letter": "F",
+        "label": "Revise",
+        "x": 708,
+        "y": 537
+      }
+    ]
+  },
+  "revision-dialog": {
+    "title": "Reviewing a revision",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Before and after, word by word",
+        "x": 400,
+        "y": 436
+      },
+      {
+        "letter": "B",
+        "label": "Tick box per change",
+        "x": 77,
+        "y": 226
+      },
+      {
+        "letter": "C",
+        "label": "Accept all or Accept selected",
+        "x": 688,
+        "y": 677
+      },
+      {
+        "letter": "D",
+        "label": "Discard",
+        "x": 103,
+        "y": 677
+      }
+    ]
+  },
+  "bible-proposals": {
+    "title": "Story bible proposals",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Approve",
+        "x": 103,
+        "y": 549
+      },
+      {
+        "letter": "B",
+        "label": "Edit and approve",
+        "x": 238,
+        "y": 549
+      },
+      {
+        "letter": "C",
+        "label": "Reject",
+        "x": 366,
+        "y": 549
+      }
+    ]
+  },
+  "cowrite-dialog": {
+    "title": "Asking for a draft",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Pick a writer, or two or three to compare",
+        "x": 109,
+        "y": 291
+      },
+      {
+        "letter": "B",
+        "label": "Instruction, with common requests underneath",
+        "x": 400,
+        "y": 607
+      },
+      {
+        "letter": "C",
+        "label": "Scene notes",
+        "x": 400,
+        "y": 826
+      },
+      {
+        "letter": "D",
+        "label": "Ask for a draft",
+        "x": 637,
+        "y": 961
+      }
+    ]
+  },
+  "drafts": {
+    "title": "A draft in the Guild panel",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "The draft, in the writer's voice",
+        "x": 400,
+        "y": 745
+      },
+      {
+        "letter": "B",
+        "label": "Insert at cursor",
+        "x": 124,
+        "y": 821
+      },
+      {
+        "letter": "C",
+        "label": "Replace selection"
+      },
+      {
+        "letter": "D",
+        "label": "Discard; Take back afterwards",
+        "x": 250,
+        "y": 821
+      }
+    ]
+  },
+  "history": {
+    "title": "A chapter's history",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Totals: runs, cost, tokens",
+        "x": 400,
+        "y": 401
+      },
+      {
+        "letter": "B",
+        "label": "Filter by kind",
+        "x": 63,
+        "y": 722
+      },
+      {
+        "letter": "C",
+        "label": "One run; click for its gateway calls",
+        "x": 400,
+        "y": 882
+      }
+    ]
+  },
+  "stats": {
+    "title": "Writer stats",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Period and project",
+        "x": 109,
+        "y": 367
+      },
+      {
+        "letter": "B",
+        "label": "One writer: notes cited, accepted, rate, drafts, cost",
+        "x": 592,
+        "y": 931
+      }
+    ]
+  },
+  "account": {
+    "title": "The Account page",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Display name",
+        "x": 400,
+        "y": 318
+      },
+      {
+        "letter": "B",
+        "label": "Change password",
+        "x": 400,
+        "y": 538
+      }
+    ]
+  },
+  "users": {
+    "title": "The Users page (admins)",
+    "marks": [
+      {
+        "letter": "A",
+        "label": "Period for the usage numbers",
+        "x": 109,
+        "y": 315
+      },
+      {
+        "letter": "B",
+        "label": "Add an account",
+        "x": 124,
+        "y": 807
+      },
+      {
+        "letter": "C",
+        "label": "Edit, Password, Disable or Enable, Delete"
+      }
+    ]
+  }
 }

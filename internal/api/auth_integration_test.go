@@ -430,8 +430,12 @@ func TestIntegrationManageAccounts(t *testing.T) {
 	if !((codes[0] == 200 && refused(codes[1])) || (refused(codes[0]) && codes[1] == 200)) {
 		t.Fatalf("concurrent demotions: %v, want one 200 and one refusal", codes)
 	}
-	if n, _ := e.q.CountActiveAdmins(ctx); n != 1 {
-		t.Fatalf("active admins after the race: %d", n)
+	// Other packages' tests may hold admins of their own in the shared test
+	// database, so judge the two accounts involved rather than a global count.
+	ua, _ := e.q.GetUserByID(ctx, e.user.ID)
+	ub, _ := e.q.GetUserByID(ctx, target.ID)
+	if (ua.Role == "admin") == (ub.Role == "admin") {
+		t.Fatalf("after the race exactly one of the two should be an admin: %s=%s %s=%s", ua.Username, ua.Role, ub.Username, ub.Role)
 	}
 	// Whoever is left cannot be demoted or disabled.
 	var remaining sqlcgen.User
@@ -476,7 +480,11 @@ func TestIntegrationManageAccounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-started
+	select {
+	case <-started:
+	case <-time.After(15 * time.Second):
+		t.Fatal("the run to be cancelled never started")
+	}
 	loserCookie := sessionFrom(login(loser.Username, "first password 1"))
 	if loserCookie == nil {
 		t.Fatal("loser login")
