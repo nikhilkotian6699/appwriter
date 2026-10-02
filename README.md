@@ -181,6 +181,12 @@ cursor, replaces the selection, or discards it, and can take a discarded
 draft back. Drafts and decisions are stored (`drafts` table,
 `PUT /api/drafts/{id}/decision`), which the writer stats use later.
 
+**Compare** is the same request sent to two or three co-writers at once
+(`writer_ids` with two or three ids; run kind `compare`). The drafts stream
+in parallel and sit side by side in the Guild panel, each with its own
+Insert, Replace, Discard and Take back; one writer failing does not spoil
+the others.
+
 ### Runs and event streams
 
 Every workflow is a run (`runs` table) executed in the background by the run

@@ -346,7 +346,7 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
               Guild
             </Button>
           )}
-          <Button size="sm" onClick={openCowrite} disabled={cowrite.isPending} title="Ask a co-writer for a draft: for the selected passage, or continuing from the cursor">
+          <Button size="sm" onClick={openCowrite} disabled={cowrite.isPending} title="Ask a co-writer for a draft, or compare two or three: for the selected passage, or continuing from the cursor">
             Co-write
           </Button>
           <Button size="sm" variant="primary" onClick={() => setConvening(true)} disabled={guildRunning} title={guildRunning ? "The Guild is still in session" : "Ask the critics to read this chapter"}>
@@ -395,7 +395,7 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
         busy={cowrite.isPending}
         error={cowrite.error}
         context={cowriteContext}
-        maxWriters={1}
+        maxWriters={3}
         onClose={() => setCowriting(false)}
         onStart={(writerIds, instruction, notes) => cowrite.mutate({ writerIds, instruction, notes })}
       />

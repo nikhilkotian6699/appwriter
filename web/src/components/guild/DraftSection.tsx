@@ -123,6 +123,7 @@ export function DraftSection({ runId, onInsert, onAskAgain }: Props) {
         {state.connectionError && <p className="mb-2 text-xs text-red-800">{state.connectionError}</p>}
         {run.data?.status === "failed" && run.data.error && <ErrorBanner error={new Error(run.data.error)} />}
         <ErrorBanner error={decide.error ?? stored.error} />
+        {compare && cards.length > 1 && <p className="mb-2 text-xs text-stone-500">The same request went to each writer. Pick the draft that serves the scene; decide on the others as you like.</p>}
         {cards.length === 0 && <p className="text-xs text-stone-500">Waiting for the writer…</p>}
         <div className={cards.length > 1 ? "grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "space-y-3"}>
           {cards.map((c) =>

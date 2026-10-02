@@ -131,6 +131,42 @@ func TestIntegrationCowrite(t *testing.T) {
 	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/drafts", CowriteStartInput{WriterIds: []uuid.UUID{uuid.New()}, Instruction: "Go."}, nil), 404, "POST", "unknown writer")
 	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/drafts", CowriteStartInput{WriterIds: []uuid.UUID{hem.Id, leguin.Id, hem.Id, uuid.New()}, Instruction: "Go."}, nil), 400, "POST", "too many writers")
 
+	// Compare: three co-writers, the same request, side by side; one fails
+	// and the other two still count.
+	marquez := e.createWriter("García Márquez", "writersguild-marquez", []WriterRole{"co-writer"}, true)
+	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/drafts", CowriteStartInput{
+		WriterIds: []uuid.UUID{hem.Id, leguin.Id, marquez.Id}, Instruction: "fail please — but only Le Guin does", Selection: ptr("She crossed the room without looking at it."),
+	}, &run), 202, "POST", "compare")
+	if run.Kind != "compare" || len(run.Params["writer_ids"].([]any)) != 3 {
+		t.Fatalf("compare run %+v", run)
+	}
+	_ = e.engine.Wait(waitCtx, run.Id)
+	e.want(e.do("GET", "/api/runs/"+run.Id.String(), nil, &run), 200, "GET", "compare run")
+	if run.Status != "succeeded" || (*run.Result)["succeeded"] != float64(2) || (*run.Result)["failed"] != float64(1) {
+		t.Fatalf("compare result %v (%s)", *run.Result, run.Error)
+	}
+	e.want(e.do("GET", "/api/runs/"+run.Id.String()+"/drafts", nil, &drafts), 200, "GET", "compare drafts")
+	if len(drafts) != 3 || drafts[0].WriterName != "Hemingway" || drafts[1].WriterName != "Le Guin" || drafts[2].WriterName != "García Márquez" {
+		t.Fatalf("compare drafts order %+v", drafts)
+	}
+	if drafts[0].Status != "succeeded" || drafts[1].Status != "failed" || drafts[2].Status != "succeeded" || drafts[0].Position != 0 || drafts[2].Position != 2 {
+		t.Fatalf("compare statuses %s %s %s", drafts[0].Status, drafts[1].Status, drafts[2].Status)
+	}
+	compareEvents := map[string]int{}
+	for _, ev := range e.streamEvents(run.Id) {
+		compareEvents[ev.Type]++
+	}
+	if compareEvents[guild.EventDraftStarted] != 3 || compareEvents[guild.EventDraftDone] != 2 || compareEvents[guild.EventDraftFailed] != 1 {
+		t.Fatalf("compare events %v", compareEvents)
+	}
+	// Each draft is decided on its own: replace one, discard the other.
+	e.want(e.do("PUT", "/api/drafts/"+drafts[2].Id.String()+"/decision", DraftDecisionInput{Decision: "replaced"}, &decided), 200, "PUT", "replace compared")
+	e.want(e.do("PUT", "/api/drafts/"+drafts[0].Id.String()+"/decision", DraftDecisionInput{Decision: "discarded"}, &decided), 200, "PUT", "discard compared")
+	e.want(e.do("GET", "/api/runs/"+run.Id.String()+"/drafts", nil, &drafts), 200, "GET", "compare drafts")
+	if drafts[0].Decision != "discarded" || drafts[2].Decision != "replaced" || drafts[1].Decision != "pending" {
+		t.Fatalf("compare decisions %s %s %s", drafts[0].Decision, drafts[1].Decision, drafts[2].Decision)
+	}
+
 	other := newEnv(t)
 	other.want(other.do("POST", "/api/chapters/"+ch.Id.String()+"/drafts", CowriteStartInput{WriterIds: []uuid.UUID{hem.Id}, Instruction: "Go."}, nil), 404, "POST", "other's chapter")
 	other.want(other.do("GET", "/api/runs/"+run.Id.String()+"/drafts", nil, nil), 404, "GET", "other's drafts")

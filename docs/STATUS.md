@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M5 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-03 (M5 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -17,8 +17,8 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 2 | Critique workflow: run engine, SSE, parallel critics, JSON validation, Langfuse metadata | Built on 5 feature branches, awaiting merge | see branches |
 | 3 | Editor-in-chief synthesis, issue list, accept/reject | Built on 2 feature branches, awaiting merge | see branches |
 | 4 | Revision with diff and hunks, bible-keeper proposals | Built on 3 feature branches, awaiting merge | see branches |
-| 5 | Co-writing workflow and compare mode | In progress (cowrite pushed; compare-mode next) | |
-| 6 | Run history, cost and writer stats, settings page | Not started | |
+| 5 | Co-writing workflow and compare mode | Built on 2 feature branches, awaiting merge | see branches |
+| 6 | Run history, cost and writer stats, settings page | Next | |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Not started | |
 | 8 | Account management: usage per user, roles, passwords, disable, delete | Not started | |
 | 9 | In-app guide for new users | Not started | |
@@ -45,7 +45,7 @@ branch is merged.
 | 4 | `feature/revision-workflow` | issue-decisions, word-diff | Pushed (awaiting merge) |
 | 4 | `feature/bible-keeper` | revision-workflow | Pushed (awaiting merge) |
 | 5 | `feature/cowrite` | run-engine | Pushed (awaiting merge) |
-| 5 | `feature/compare-mode` | cowrite | Not started |
+| 5 | `feature/compare-mode` | cowrite | Pushed (awaiting merge) |
 | 6 | `feature/run-history` | — | Not started |
 | 6 | `feature/writer-stats` | — | Not started |
 | 7 | `feature/auth-lib` | — | Not started |
@@ -155,7 +155,15 @@ merged, origin did not show it yet when work started):
   and scene notes, Co-writer section streaming the draft with Insert at
   cursor / Replace selection / Discard / Take back (Markdown inserted through
   the editor), reattach to pending drafts on load; unit and integration tests.
-- Next: `feature/compare-mode` (two or three writers side by side).
+- `feature/compare-mode` is done and pushed: the Co-write dialog takes one
+  writer to co-write or two or three to compare, drafts sit side by side in
+  the Guild panel with independent decisions, the fake gateway varies its
+  drafts by writer, integration coverage for a compare run with one failing
+  writer.
+
+Milestone 5 is complete pending merge (order: cowrite, compare-mode) and the
+live gateway check. Next: Milestone 6 on `feature/run-history` and
+`feature/writer-stats`.
 
 ## Open items
 

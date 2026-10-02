@@ -228,7 +228,7 @@ func (g *gateway) reply(req chatRequest) string {
 	case strings.HasPrefix(gen, "test:"):
 		return fmt.Sprintf("I am %s, answering through the fake gateway as the model %q. When I read a chapter I look first for the sentence where the writer stopped trusting the reader, then for the one that earned its place. This reply is canned, so the real voice will have to wait for the real gateway.", name, req.Model)
 	case strings.HasPrefix(gen, "cowrite:"):
-		return "The lamp had been burning since before anyone remembered lighting it. She crossed the room without looking at it, the way you avoid looking at a person who has been talking for too long, and put her hand flat against the window to feel whether the cold outside was the honest kind. It was not. It was the kind that waits."
+		return cowriteReply(name)
 	default:
 		return fmt.Sprintf("This is a canned reply from the fake gateway for %q using model %q.", gen, req.Model)
 	}
@@ -305,6 +305,21 @@ func critiqueReply(name string, msgs []message) string {
 	}
 	b, _ := json.MarshalIndent(out, "", "  ")
 	return string(b)
+}
+
+// cowriteReply picks one of three canned drafts by writer, so a compare run
+// shows different texts side by side.
+func cowriteReply(name string) string {
+	drafts := []string{
+		"The lamp had been burning since before anyone remembered lighting it. She crossed the room without looking at it, the way you avoid looking at a person who has been talking for too long, and put her hand flat against the window to feel whether the cold outside was the honest kind. It was not. It was the kind that waits.",
+		"She did not look at the lamp. She looked at the window, at the frost climbing it in slow handwriting, and told herself the cold was honest. Honest cold does not wait for you. This one did.",
+		"Nobody had lit the lamp; it had simply been burning, the way some facts are simply true. She went to the window, laid her palm on the glass, and learned what she already knew: the cold out there had patience, and patience is never kind.",
+	}
+	sum := 0
+	for _, r := range name {
+		sum += int(r)
+	}
+	return drafts[sum%len(drafts)]
 }
 
 // bibleKeeperReply proposes one update of the first bible entry it finds
