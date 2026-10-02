@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -13,10 +15,58 @@ import (
 
 	"github.com/google/uuid"
 
+	"writersguild/internal/db/sqlcgen"
 	"writersguild/internal/guild"
 	"writersguild/internal/llm"
 	"writersguild/internal/runs"
 )
+
+// editorJSON merges the critics' notes found in the editor-in-chief prompt
+// the way a cooperative model would: one issue per distinct quote, citing
+// every source that quoted it.
+var sourceLine = regexp.MustCompile(`\[([a-z0-9-]+/[A-Za-z0-9_-]+)\] (high|medium|low) — quote: ("(?:[^"\\]|\\.)*")`)
+
+func editorJSON(prompt string) string {
+	type group struct {
+		sev   string
+		quote string
+		ids   []string
+	}
+	var order []string
+	groups := map[string]*group{}
+	for _, m := range sourceLine.FindAllStringSubmatch(prompt, -1) {
+		q, err := strconv.Unquote(m[3])
+		if err != nil {
+			q = strings.Trim(m[3], `"`)
+		}
+		g, ok := groups[q]
+		if !ok {
+			g = &group{sev: m[2], quote: q}
+			groups[q] = g
+			order = append(order, q)
+		}
+		g.ids = append(g.ids, m[1])
+	}
+	var issues []map[string]any
+	for i, q := range order {
+		g := groups[q]
+		issues = append(issues, map[string]any{"id": fmt.Sprintf("e%d", i+1), "severity": g.sev, "quote": g.quote, "problem": fmt.Sprintf("%d critics agree.", len(g.ids)), "suggested_fix": "Cut.", "sources": g.ids})
+	}
+	b, _ := json.Marshal(map[string]any{"issues": issues})
+	return string(b)
+}
+
+// createEditor gives the account its editor-in-chief system agent.
+func (e *env) createEditor(alias string) sqlcgen.Writer {
+	e.t.Helper()
+	w, err := e.q.CreateWriter(context.Background(), sqlcgen.CreateWriterParams{
+		UserID: e.user.ID, Name: "Editor-in-chief", Slug: "editor-in-chief", ModelAlias: alias, SystemPrompt: "You are the editor.", Roles: []string{}, Enabled: true, Temperature: 0.3, IsSystem: true,
+	})
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	return w
+}
 
 // sceneText pulls the chapter or scene out of a critic prompt.
 func sceneText(req llm.Request) string {
@@ -137,6 +187,8 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	e.want(e.do("PUT", "/api/settings", SettingsInput{SceneTokenLimit: 500, AutosaveSnapshotMinutes: 10}, nil), 200, "PUT", "/api/settings")
 	e.want(e.do("POST", "/api/projects/"+p.Id.String()+"/bible", BibleEntryInput{Section: "character", Title: "Mara", Fields: map[string]string{"role": "harbour master", "voice": "clipped"}}, nil), 201, "POST", "bible")
 
+	e.createEditor("writersguild-editor")
+	var editorFails atomic.Bool
 	critic := []WriterRole{"critic"}
 	good := e.createWriter("Good", "writersguild-good", critic, true)
 	flaky := e.createWriter("Flaky", "writersguild-flaky", critic, true)
@@ -146,6 +198,15 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 
 	var flakyCalls atomic.Int32
 	e.mock.StreamFn = func(ctx context.Context, req llm.Request, onDelta func(string)) (*llm.Response, error) {
+		if req.Metadata.GenerationName == "editor-in-chief" {
+			if req.Model != "writersguild-editor" || !req.JSONMode || !strings.Contains(req.Messages[1].Content, "[writersguild-good/") && !strings.Contains(req.Messages[1].Content, "[good/") {
+				t.Errorf("editor request wrong: model %q json %v", req.Model, req.JSONMode)
+			}
+			if editorFails.Load() {
+				return nil, &llm.GatewayError{Status: 500, Message: "editor exploded"}
+			}
+			return streamJSON(editorJSON(req.Messages[1].Content), onDelta), nil
+		}
 		if !req.JSONMode || !strings.HasPrefix(req.Metadata.GenerationName, "critic:") || req.Metadata.TraceID == "" || req.Metadata.SessionID != ch.Id.String() {
 			t.Errorf("critic request lacks json mode or metadata: %+v", req.Metadata)
 		}
@@ -181,6 +242,41 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	res := *run.Result
 	if res["succeeded"] != float64(2) || res["failed"] != float64(1) || res["scenes"] != float64(2) {
 		t.Fatalf("run result %v", res)
+	}
+	if res["synthesis"] != "ok" || res["issues"] != float64(4) {
+		t.Fatalf("synthesis result %v", res)
+	}
+
+	// The editor-in-chief merged the two critics' notes: both quoted the same
+	// two sentences per scene, so four issues each citing two sources.
+	var issues []Issue
+	e.want(e.do("GET", "/api/runs/"+run.Id.String()+"/issues", nil, &issues), 200, "GET", "issues")
+	if len(issues) != 4 {
+		t.Fatalf("want 4 merged issues, got %d", len(issues))
+	}
+	for i, is := range issues {
+		if is.Position != i || is.Key != fmt.Sprintf("e%d", i+1) || is.Decision != "pending" || is.EditedFix != nil || is.ContentHash != ch.ContentHash {
+			t.Fatalf("issue %d fields %+v", i, is)
+		}
+		if chapterMD[is.Start:is.End] != is.Quote {
+			t.Fatalf("issue %s not anchored: %q", is.Key, chapterMD[is.Start:is.End])
+		}
+		if len(is.Sources) != 2 {
+			t.Fatalf("issue %s sources %+v", is.Key, is.Sources)
+		}
+		names := map[string]bool{}
+		for _, src := range is.Sources {
+			names[src.WriterName] = true
+			if src.WriterId != good.Id && src.WriterId != flaky.Id || src.IssueId == "" || !strings.HasPrefix(src.Id, src.WriterSlug+"/") {
+				t.Fatalf("source %+v", src)
+			}
+		}
+		if !names["Good"] || !names["Flaky"] {
+			t.Fatalf("issue %s should cite both critics: %v", is.Key, names)
+		}
+	}
+	if !strings.Contains(issues[0].Quote, "first boat") || !strings.Contains(issues[3].Quote, "second boat") {
+		t.Fatalf("issue order %q / %q", issues[0].Quote, issues[3].Quote)
 	}
 	if run.PromptTokens == 0 || run.CostUsd == 0 || !run.CostEstimated {
 		t.Fatalf("run usage not accumulated: %+v", run)
@@ -243,6 +339,18 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	if counts[guild.EventWriterStarted] != 3 || counts[guild.EventWriterDone] != 2 || counts[guild.EventWriterFailed] != 1 || counts[guild.EventWriterRetry] < 1 || counts[guild.EventWriterDelta] < 4 || counts[runs.EventRunFinished] != 1 {
 		t.Fatalf("event counts %v", counts)
 	}
+	if counts[guild.EventEditorStarted] != 1 || counts[guild.EventEditorDelta] < 1 || counts[guild.EventEditorDone] != 1 {
+		t.Fatalf("editor event counts %v", counts)
+	}
+	for _, ev := range events {
+		if ev.Type == guild.EventEditorDone {
+			var ed guild.EditorEvent
+			_ = json.Unmarshal(ev.Payload, &ed)
+			if ed.Fallback || len(ed.Issues) != 4 || ed.Issues[0].Key != "e1" || len(ed.Issues[0].Sources) != 2 || ed.Usage == nil || ed.Usage.PromptTokens == 0 {
+				t.Fatalf("editor.done payload %+v", ed)
+			}
+		}
+	}
 	for i := 1; i < len(events); i++ {
 		if events[i].Seq != events[i-1].Seq+1 {
 			t.Fatalf("event sequence has a gap at %d: %v -> %v", i, events[i-1].Seq, events[i].Seq)
@@ -263,13 +371,36 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	other := newEnv(t)
 	other.want(other.do("POST", "/api/chapters/"+ch.Id.String()+"/critiques", nil, nil), 404, "POST", "other's chapter")
 	other.want(other.do("GET", "/api/runs/"+run.Id.String()+"/critiques", nil, nil), 404, "GET", "other's critiques")
+	other.want(other.do("GET", "/api/runs/"+run.Id.String()+"/issues", nil, nil), 404, "GET", "other's issues")
 
-	// Default selection: every enabled critic (good, flaky, failing; not the disabled one or the co-writer).
+	// Default selection: every enabled critic (good, flaky, failing; not the
+	// disabled one or the co-writer). This time the editor-in-chief fails, so
+	// the list falls back to the critics' notes unmerged.
+	editorFails.Store(true)
 	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/critiques", nil, &run), 202, "POST", "critiques default")
 	_ = e.engine.Wait(waitCtx, run.Id)
 	e.want(e.do("GET", "/api/runs/"+run.Id.String()+"/critiques", nil, &recs), 200, "GET", "critiques")
 	if len(recs) != 3 {
 		t.Fatalf("default selection convened %d critics, want 3", len(recs))
+	}
+	e.want(e.do("GET", "/api/runs/"+run.Id.String(), nil, &run), 200, "GET", "run")
+	if run.Status != "succeeded" || (*run.Result)["synthesis"] != "fallback" || (*run.Result)["issues"] != float64(8) {
+		t.Fatalf("fallback run %+v", run)
+	}
+	e.want(e.do("GET", "/api/runs/"+run.Id.String()+"/issues", nil, &issues), 200, "GET", "issues")
+	if len(issues) != 8 || len(issues[0].Sources) != 1 || issues[0].Severity != "high" || issues[7].Severity != "medium" {
+		t.Fatalf("fallback issues: %d, first %+v", len(issues), issues[0])
+	}
+	fallbackSeen := false
+	for _, ev := range e.streamEvents(run.Id) {
+		if ev.Type == guild.EventEditorDone {
+			var ed guild.EditorEvent
+			_ = json.Unmarshal(ev.Payload, &ed)
+			fallbackSeen = ed.Fallback && strings.Contains(ed.Error, "500") && len(ed.Warnings) > 0
+		}
+	}
+	if !fallbackSeen {
+		t.Fatal("editor.done should report the fallback with the gateway error")
 	}
 }
 

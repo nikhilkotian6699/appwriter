@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, call, type Critique, type CritiqueIssue, type CritiqueRecord, type Run, type RunStatus } from "../../api/client";
-import { keys, useRun, useRunCritiques } from "../../api/hooks";
-import { useRunEvents, type FinishedPayload, type PlanPayload, type RunEventMessage, type WriterPayload, type WriterUsage } from "../../api/events";
+import { api, call, type Critique, type CritiqueRecord, type IssueSource, type Run, type RunStatus } from "../../api/client";
+import { keys, useRun, useRunCritiques, useRunIssues } from "../../api/hooks";
+import { useRunEvents, type EditorPayload, type EventIssue, type FinishedPayload, type PlanPayload, type RunEventMessage, type WriterPayload, type WriterUsage } from "../../api/events";
 import { Badge, Button, ErrorBanner, Spinner } from "../ui";
 import { fmtCost, fmtTokens, timeAgo } from "../../lib/format";
 
@@ -24,15 +24,30 @@ type WriterState = {
   rawText?: string;
 };
 
+type EditorStatus = "idle" | "reading" | "retrying" | "done";
+
+type EditorState = {
+  status: EditorStatus;
+  text: string;
+  retries: number;
+  retryReason?: string;
+  issues?: EventIssue[];
+  warnings?: string[];
+  fallback?: boolean;
+  error?: string;
+  usage?: WriterUsage;
+};
+
 type State = {
   plan?: PlanPayload;
   writers: Record<string, WriterState>;
   order: string[];
+  editor: EditorState;
   finished?: FinishedPayload;
   connectionError?: string;
 };
 
-const initial: State = { writers: {}, order: [] };
+const initial: State = { writers: {}, order: [], editor: { status: "idle", text: "", retries: 0 } };
 
 function reduce(state: State, ev: RunEventMessage | { type: "connection.error"; message: string }): State {
   switch (ev.type) {
@@ -61,6 +76,16 @@ function reduce(state: State, ev: RunEventMessage | { type: "connection.error"; 
         next = { ...cur, status: state.finished?.status === "cancelled" || p.error === "context canceled" ? "cancelled" : "failed", error: p.error, critique: p.critique, usage: p.usage, rawText: (cur.rawText ? cur.rawText + "\n\n" : "") + cur.text };
       const order = state.order.includes(p.critique_id) ? state.order : [...state.order, p.critique_id];
       return { ...state, writers: { ...state.writers, [p.critique_id]: next }, order };
+    }
+    case "editor.started":
+      return { ...state, editor: { ...state.editor, status: "reading" } };
+    case "editor.delta":
+      return { ...state, editor: { ...state.editor, status: "reading", text: state.editor.text + (ev.payload.text ?? "") } };
+    case "editor.retry":
+      return { ...state, editor: { ...state.editor, status: "retrying", retries: state.editor.retries + 1, retryReason: ev.payload.reason, text: "" } };
+    case "editor.done": {
+      const p = ev.payload as EditorPayload;
+      return { ...state, editor: { ...state.editor, status: "done", issues: p.issues ?? [], warnings: p.warnings, fallback: p.fallback, error: p.error, usage: p.usage } };
     }
     case "run.finished": {
       const writers = { ...state.writers };
@@ -111,6 +136,7 @@ export function GuildPanel({ runId, currentHash, onHighlight, onConveneAgain }: 
   const runStatus: RunStatus | undefined = state.finished?.status ?? run.data?.status;
   const isLive = run.data?.status === "running" && !state.finished;
   const records = useRunCritiques(runId, !!run.data && run.data.status !== "running");
+  const storedIssues = useRunIssues(runId, !!run.data && run.data.status !== "running");
 
   useRunEvents(
     runId,
@@ -120,6 +146,7 @@ export function GuildPanel({ runId, currentHash, onHighlight, onConveneAgain }: 
       if (ev.type === "run.finished") {
         qc.invalidateQueries({ queryKey: keys.run(runId) });
         qc.invalidateQueries({ queryKey: keys.runCritiques(runId) });
+        qc.invalidateQueries({ queryKey: keys.runIssues(runId) });
         if (run.data?.chapter_id) qc.invalidateQueries({ queryKey: keys.chapterRuns(run.data.chapter_id, "critique") });
       }
     },
@@ -154,6 +181,9 @@ export function GuildPanel({ runId, currentHash, onHighlight, onConveneAgain }: 
     return { prompt, completion, cost, estimated };
   }, [writers, state.finished, run.data]);
 
+  const issues: EventIssue[] | undefined = state.editor.status === "done" ? state.editor.issues : storedIssues.data;
+  const synthesis = (run.data?.result?.synthesis as string | undefined) ?? (state.editor.fallback ? "fallback" : undefined);
+  const editorDone = state.editor.status === "done" || (!!run.data && run.data.status !== "running");
   const planHash = state.plan?.content_hash ?? (run.data?.params?.content_hash as string | undefined);
   const stale = !!planHash && planHash !== currentHash;
   const sceneCount = state.plan?.scenes.length ?? records.data?.[0]?.scene_count ?? 1;
@@ -192,9 +222,21 @@ export function GuildPanel({ runId, currentHash, onHighlight, onConveneAgain }: 
       <ErrorBanner error={cancel.error} />
       {records.isLoading && writers.length === 0 && <Spinner />}
       {writers.length === 0 && !records.isLoading && runStatus === "running" && <p className="text-sm text-stone-500">Convening…</p>}
-      {writers.map((w) => (
-        <WriterCard key={w.critiqueId} writer={w} onHighlight={onHighlight} />
-      ))}
+      {(state.editor.status !== "idle" || (issues && issues.length > 0) || synthesis) && (
+        <EditorSection editor={state.editor} issues={issues} synthesis={synthesis} loading={storedIssues.isLoading} runError={run.data?.error} onHighlight={onHighlight} />
+      )}
+      {writers.length > 0 && (
+        <details open={!editorDone} className="group">
+          <summary className="cursor-pointer select-none text-sm font-medium text-stone-700 hover:text-stone-900">
+            Critics' notes ({writers.length})
+          </summary>
+          <div className="mt-2 flex flex-col gap-3">
+            {writers.map((w) => (
+              <WriterCard key={w.critiqueId} writer={w} onHighlight={onHighlight} />
+            ))}
+          </div>
+        </details>
+      )}
       {(runStatus === "succeeded" || runStatus === "failed" || runStatus === "cancelled" || totals.prompt > 0) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-200 pt-2 text-xs text-stone-500">
           <span>
@@ -334,7 +376,9 @@ function WriterCard({ writer: w, onHighlight }: { writer: WriterState; onHighlig
 
 const severityTone: Record<string, "red" | "amber" | "stone"> = { high: "red", medium: "amber", low: "stone" };
 
-function IssueItem({ issue, onClick, missing }: { issue: CritiqueIssue; onClick: () => void; missing: boolean }) {
+type IssueLike = { severity: string; quote: string; problem: string; suggested_fix: string };
+
+function IssueItem({ issue, sources, onClick, missing, children }: { issue: IssueLike; sources?: IssueSource[]; onClick: () => void; missing: boolean; children?: React.ReactNode }) {
   return (
     <li className="rounded-md border border-stone-200 p-2">
       <div className="flex items-start gap-2">
@@ -351,6 +395,95 @@ function IssueItem({ issue, onClick, missing }: { issue: CritiqueIssue; onClick:
           {issue.suggested_fix}
         </p>
       )}
+      {sources && sources.length > 0 && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-stone-500">
+          <span>Raised by</span>
+          {sources.map((src) => (
+            <span key={src.id} className="rounded bg-stone-100 px-1.5 py-0.5 text-stone-700" title={src.id}>
+              {src.writer_name}
+            </span>
+          ))}
+        </p>
+      )}
+      {children}
     </li>
+  );
+}
+
+function EditorSection({
+  editor,
+  issues,
+  synthesis,
+  loading,
+  runError,
+  onHighlight,
+}: {
+  editor: EditorState;
+  issues?: EventIssue[];
+  synthesis?: string;
+  loading: boolean;
+  runError?: string;
+  onHighlight: (quote: string) => boolean;
+}) {
+  const [notFound, setNotFound] = useState<string | null>(null);
+  const streamRef = useRef<HTMLPreElement | null>(null);
+  useEffect(() => {
+    if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight;
+  }, [editor.text]);
+  const live = editor.status === "reading" || editor.status === "retrying";
+  const fallback = synthesis === "fallback" || editor.fallback === true;
+  const click = (quote: string) => setNotFound(onHighlight(quote) ? null : quote);
+  return (
+    <section className="rounded-lg border border-stone-300 bg-white shadow-sm">
+      <header className="flex items-center justify-between gap-2 border-b border-stone-200 bg-stone-50 px-3 py-2">
+        <div>
+          <div className="font-medium text-stone-900">Editor-in-chief</div>
+          <div className="text-[11px] text-stone-500">{fallback ? "critics' notes, unmerged" : "the prioritized list"}</div>
+        </div>
+        <Badge tone={live ? "amber" : fallback ? "amber" : editor.status === "done" || issues ? "green" : "stone"}>
+          {live && <Spinner className="mr-1 inline h-3 w-3" />}
+          {editor.status === "reading" ? "merging…" : editor.status === "retrying" ? "asking again…" : fallback ? "fallback" : issues ? `${issues.length} issue${issues.length === 1 ? "" : "s"}` : "…"}
+        </Badge>
+      </header>
+      <div className="px-3 py-2 text-sm">
+        {live && (
+          <>
+            {editor.status === "retrying" && editor.retryReason && <p className="mb-1 text-xs text-amber-800">The first reply was not valid ({editor.retryReason}). Asking once more.</p>}
+            <pre ref={streamRef} className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded bg-stone-50 p-2 font-mono text-[11px] leading-snug text-stone-600">
+              {editor.text || "…"}
+            </pre>
+          </>
+        )}
+        {fallback && (
+          <p className="mb-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+            The editor-in-chief could not merge the notes{editor.error ? ` (${editor.error})` : runError ? ` (${runError})` : ""}. The critics' issues are listed unmerged, most severe first.
+          </p>
+        )}
+        {loading && !issues && <Spinner />}
+        {issues && issues.length === 0 && !live && <p className="text-xs text-stone-500">The editor-in-chief set every note aside: nothing here needs changing.</p>}
+        {issues && issues.length > 0 && (
+          <ol className="space-y-2">
+            {issues.map((is) => (
+              <IssueItem key={is.id} issue={is} sources={is.sources} onClick={() => click(is.quote)} missing={notFound === is.quote} />
+            ))}
+          </ol>
+        )}
+        {editor.warnings && editor.warnings.length > 0 && (
+          <details className="mt-2 text-xs text-stone-500">
+            <summary className="cursor-pointer">{editor.warnings.length} note{editor.warnings.length === 1 ? "" : "s"} from validation</summary>
+            <ul className="mt-1 list-disc pl-4">
+              {editor.warnings.map((m, i) => (
+                <li key={i}>{m}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+        {editor.usage && (editor.status === "done") && (
+          <p className="mt-2 text-[11px] text-stone-400">
+            {fmtTokens(editor.usage.prompt_tokens + editor.usage.completion_tokens)} tokens · {fmtCost(editor.usage.cost_usd, editor.usage.cost_estimated)}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

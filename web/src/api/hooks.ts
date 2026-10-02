@@ -14,6 +14,7 @@ export const keys = {
   writers: ["writers"] as const,
   run: (id: string) => ["runs", id] as const,
   runCritiques: (id: string) => ["runs", id, "critiques"] as const,
+  runIssues: (id: string) => ["runs", id, "issues"] as const,
   chapterRuns: (chapterId: string, kind?: string) => ["chapters", chapterId, "runs", kind ?? "all"] as const,
 };
 
@@ -98,5 +99,13 @@ export function useChapterRuns(chapterId: string, kind?: "critique" | "revision"
   return useQuery({
     queryKey: keys.chapterRuns(chapterId, kind),
     queryFn: () => call(api.GET("/api/chapters/{chapterId}/runs", { params: { path: { chapterId }, query: { kind, limit } } })),
+  });
+}
+
+export function useRunIssues(id: string | null, enabled = true) {
+  return useQuery({
+    queryKey: keys.runIssues(id ?? ""),
+    queryFn: () => call(api.GET("/api/runs/{runId}/issues", { params: { path: { runId: id! } } })),
+    enabled: !!id && enabled,
   });
 }

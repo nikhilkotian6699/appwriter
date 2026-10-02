@@ -14,6 +14,7 @@ import (
 	"writersguild/internal/db/sqlcgen"
 	"writersguild/internal/llm"
 	"writersguild/internal/runs"
+	"writersguild/internal/seed"
 	"writersguild/internal/text"
 )
 
@@ -25,6 +26,10 @@ const (
 	EventWriterRetry   = "writer.retry"   // the reply was invalid; asking once more
 	EventWriterDone    = "writer.done"    // the critic's validated critique
 	EventWriterFailed  = "writer.failed"  // the critic gave up (gateway error, invalid output twice, timeout)
+	EventEditorStarted = "editor.started" // the editor-in-chief began merging the notes
+	EventEditorDelta   = "editor.delta"   // a chunk of the editor-in-chief's streamed reply
+	EventEditorRetry   = "editor.retry"   // the editor's reply was invalid; asking once more
+	EventEditorDone    = "editor.done"    // the prioritized list (fallback=true when assembled without the editor)
 )
 
 // Critique statuses, matching the critiques table.
@@ -95,6 +100,52 @@ type CritiqueResult struct {
 	Succeeded int         `json:"succeeded"`
 	Failed    int         `json:"failed"`
 	Scenes    int         `json:"scenes"`
+	// Issues counts the editor-in-chief's list; Synthesis is "ok", "fallback"
+	// (assembled from the critics' notes after the editor failed) or
+	// "skipped" (no critic succeeded).
+	Issues    int    `json:"issues"`
+	Synthesis string `json:"synthesis"`
+}
+
+// EditorEvent is the payload of the editor.* events.
+type EditorEvent struct {
+	WriterID uuid.UUID     `json:"writer_id"`
+	Slug     string        `json:"slug"`
+	Text     string        `json:"text,omitempty"`     // editor.delta
+	Reason   string        `json:"reason,omitempty"`   // editor.retry
+	Error    string        `json:"error,omitempty"`    // editor.done with fallback
+	Fallback bool          `json:"fallback"`           // editor.done
+	Issues   []StoredIssue `json:"issues,omitempty"`   // editor.done
+	Warnings []string      `json:"warnings,omitempty"` // editor.done
+	Usage    *Usage        `json:"usage,omitempty"`    // editor.done
+}
+
+// StoredIssue is an issue row as the events and the API present it.
+type StoredIssue struct {
+	ID           uuid.UUID     `json:"id"`
+	Key          string        `json:"key"`
+	Position     int           `json:"position"`
+	Severity     string        `json:"severity"`
+	Quote        string        `json:"quote"`
+	Problem      string        `json:"problem"`
+	SuggestedFix string        `json:"suggested_fix"`
+	Start        int           `json:"start"`
+	End          int           `json:"end"`
+	QuoteExact   bool          `json:"quote_exact"`
+	Sources      []IssueSource `json:"sources"`
+	Decision     string        `json:"decision"`
+	EditedFix    *string       `json:"edited_fix,omitempty"`
+}
+
+// ToStoredIssue converts a row.
+func ToStoredIssue(r sqlcgen.Issue) StoredIssue {
+	out := StoredIssue{ID: r.ID, Key: r.Key, Position: int(r.Position), Severity: r.Severity, Quote: r.Quote, Problem: r.Problem, SuggestedFix: r.SuggestedFix,
+		Start: int(r.QuoteStart), End: int(r.QuoteEnd), QuoteExact: r.QuoteExact, Sources: []IssueSource{}, Decision: r.Decision, EditedFix: r.EditedFix}
+	_ = json.Unmarshal(r.Sources, &out.Sources)
+	if out.Sources == nil {
+		out.Sources = []IssueSource{}
+	}
+	return out
 }
 
 // Critique convenes the chosen critics on a chapter. It returns as soon as
@@ -148,23 +199,25 @@ func (g *Guild) runCritique(ctx context.Context, run *runs.Run, em *runs.Emitter
 		return nil, err
 	}
 
-	result := CritiqueResult{Scenes: len(scenes)}
+	result := CritiqueResult{Scenes: len(scenes), Synthesis: "skipped"}
+	sources := make([]CritiqueSource, len(in.Writers))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for i := range in.Writers {
 		wg.Add(1)
-		go func(w sqlcgen.Writer, row sqlcgen.Critique) {
+		go func(i int, w sqlcgen.Writer, row sqlcgen.Critique) {
 			defer wg.Done()
-			ok := g.critic(ctx, run, em, in, scenes, bible, w, row)
+			c, ok := g.critic(ctx, run, em, in, scenes, bible, w, row)
 			mu.Lock()
 			result.Critiques = append(result.Critiques, row.ID)
 			if ok {
 				result.Succeeded++
+				sources[i] = CritiqueSource{CritiqueID: row.ID, WriterID: w.ID, WriterName: w.Name, WriterSlug: w.Slug, Critique: c}
 			} else {
 				result.Failed++
 			}
 			mu.Unlock()
-		}(in.Writers[i], rows[i])
+		}(i, in.Writers[i], rows[i])
 	}
 	wg.Wait()
 	if ctx.Err() != nil {
@@ -173,12 +226,123 @@ func (g *Guild) runCritique(ctx context.Context, run *runs.Run, em *runs.Emitter
 	if result.Succeeded == 0 {
 		return result, errors.New("every writer failed; see the writers' panels for the reasons")
 	}
+	var ok []CritiqueSource
+	for _, s := range sources {
+		if s.Critique != nil {
+			ok = append(ok, s)
+		}
+	}
+	syn, err := g.synthesize(ctx, run, em, in, bible, ok)
+	if err != nil {
+		return result, err
+	}
+	result.Issues = len(syn.Issues)
+	result.Synthesis = "ok"
+	if syn.Fallback {
+		result.Synthesis = "fallback"
+	}
 	return result, nil
 }
 
-// critic runs one writer over every scene, streaming as it goes. It reports
-// whether the writer produced a usable critique.
-func (g *Guild) critic(ctx context.Context, run *runs.Run, em *runs.Emitter, in CritiqueInput, scenes []text.Scene, bible string, w sqlcgen.Writer, row sqlcgen.Critique) bool {
+// synthesize runs the editor-in-chief over the critics' notes, stores the
+// prioritized list and emits the editor.* events. When the editor fails for
+// any reason the list is assembled from the notes instead, so the author
+// always has something to decide on.
+func (g *Guild) synthesize(ctx context.Context, run *runs.Run, em *runs.Emitter, in CritiqueInput, bible string, critiques []CritiqueSource) (*Synthesis, error) {
+	editor, err := g.q.GetWriterBySlug(ctx, sqlcgen.GetWriterBySlugParams{UserID: run.Row.UserID, Slug: seed.SlugEditorInChief})
+	base := EditorEvent{Slug: seed.SlugEditorInChief}
+	var syn *Synthesis
+	var usage Usage
+	if err != nil {
+		syn = FallbackSynthesis(critiques, "no editor-in-chief writer exists in this workspace")
+	} else {
+		base.WriterID = editor.ID
+		_ = em.Emit(ctx, EventEditorStarted, base)
+		var ferr error
+		syn, usage, ferr = g.editorCall(ctx, run, em, in, bible, editor, base, critiques)
+		if ferr != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			syn = FallbackSynthesis(critiques, ferr.Error())
+			base.Error = ferr.Error()
+		}
+	}
+	bg := context.WithoutCancel(ctx)
+	rows, err := g.storeIssues(bg, run, in.Chapter, syn)
+	if err != nil {
+		return nil, fmt.Errorf("store issues: %w", err)
+	}
+	ev := base
+	ev.Fallback = syn.Fallback
+	ev.Warnings = syn.Warnings
+	ev.Usage = &usage
+	ev.Issues = make([]StoredIssue, 0, len(rows))
+	for _, r := range rows {
+		ev.Issues = append(ev.Issues, ToStoredIssue(r))
+	}
+	_ = em.Emit(bg, EventEditorDone, ev)
+	return syn, nil
+}
+
+// editorCall asks the editor-in-chief once, retrying once on invalid output.
+func (g *Guild) editorCall(ctx context.Context, run *runs.Run, em *runs.Emitter, in CritiqueInput, bible string, editor sqlcgen.Writer, base EditorEvent, critiques []CritiqueSource) (*Synthesis, Usage, error) {
+	var usage Usage
+	input := BuildEditorInput(in.Project.Name, in.Chapter.Title, in.Chapter.ContentMd, bible, in.SceneTokenLimit, critiques)
+	messages := []llm.Message{
+		{Role: "system", Content: EditorSystemPrompt(editor.SystemPrompt)},
+		{Role: "user", Content: input.Prompt},
+	}
+	for attempt := 1; attempt <= 2; attempt++ {
+		callCtx, cancel := context.WithTimeout(ctx, g.CallTimeout)
+		stream := newDeltaStream(em, func(text string) (string, any) {
+			ev := base
+			ev.Text = text
+			return EventEditorDelta, ev
+		})
+		req := llm.Request{Model: editor.ModelAlias, Messages: messages, Temperature: llm.Float64(editor.Temperature), JSONMode: true}
+		resp, err := g.tracker.Call(callCtx, run, runs.CallOpts{
+			WriterID: uuid.NullUUID{UUID: editor.ID, Valid: true}, GenerationName: "editor-in-chief", OnDelta: stream.delta,
+		}, req)
+		stream.flush(callCtx)
+		cancel()
+		if resp != nil {
+			usage.addResponse(resp)
+		}
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, usage, ctx.Err()
+			}
+			if errors.Is(err, context.DeadlineExceeded) {
+				return nil, usage, fmt.Errorf("the editor-in-chief did not answer within %s", g.CallTimeout)
+			}
+			return nil, usage, errors.New(FriendlyError(err))
+		}
+		syn, perr := ParseSynthesis(resp.Content, in.Chapter.ContentMd, input)
+		if perr == nil {
+			return syn, usage, nil
+		}
+		var verr *ValidationError
+		if !errors.As(perr, &verr) {
+			return nil, usage, perr
+		}
+		if attempt == 2 {
+			return nil, usage, fmt.Errorf("the editor-in-chief returned invalid output twice: %s", strings.Join(verr.Problems, "; "))
+		}
+		retry := base
+		retry.Reason = strings.Join(verr.Problems, "; ")
+		_ = em.Emit(ctx, EventEditorRetry, retry)
+		messages = append(messages,
+			llm.Message{Role: "assistant", Content: resp.Content},
+			llm.Message{Role: "user", Content: RetryPrompt(verr)},
+		)
+	}
+	return nil, usage, errors.New("unreachable")
+}
+
+// critic runs one writer over every scene, streaming as it goes. It returns
+// the merged critique and whether the writer produced a usable one.
+func (g *Guild) critic(ctx context.Context, run *runs.Run, em *runs.Emitter, in CritiqueInput, scenes []text.Scene, bible string, w sqlcgen.Writer, row sqlcgen.Critique) (*Critique, bool) {
 	base := WriterEvent{CritiqueID: row.ID, WriterID: w.ID, Slug: w.Slug}
 	_ = em.Emit(ctx, EventWriterStarted, base)
 
@@ -250,14 +414,14 @@ func (g *Guild) critic(ctx context.Context, run *runs.Run, em *runs.Emitter, in 
 	if status == CritiqueSucceeded {
 		ev.Critique = merged
 		_ = em.Emit(bg, EventWriterDone, ev)
-		return true
+		return merged, true
 	}
 	ev.Error = failErr
 	if critiqueJSON != nil {
 		ev.Critique = merged
 	}
 	_ = em.Emit(bg, EventWriterFailed, ev)
-	return false
+	return nil, false
 }
 
 // criticScene asks one writer about one scene, validating the reply and
@@ -272,7 +436,12 @@ func (g *Guild) criticScene(ctx context.Context, run *runs.Run, em *runs.Emitter
 	var transcript strings.Builder
 	for attempt := 1; attempt <= 2; attempt++ {
 		callCtx, cancel := context.WithTimeout(ctx, g.CallTimeout)
-		stream := newDeltaStream(em, base, sc.Index)
+		stream := newDeltaStream(em, func(text string) (string, any) {
+			ev := base
+			ev.Scene = sc.Index
+			ev.Text = text
+			return EventWriterDelta, ev
+		})
 		req := llm.Request{Model: w.ModelAlias, Messages: messages, Temperature: llm.Float64(w.Temperature), JSONMode: true}
 		resp, err := g.tracker.Call(callCtx, run, runs.CallOpts{
 			WriterID: uuid.NullUUID{UUID: w.ID, Valid: true}, GenerationName: "critic:" + w.Slug, OnDelta: stream.delta,
@@ -336,12 +505,12 @@ func (u *Usage) addResponse(r *llm.Response) {
 	}
 }
 
-// deltaStream coalesces streamed fragments into writer.delta events so a
-// long reply does not become hundreds of stored rows.
+// deltaStream coalesces streamed fragments into delta events so a long reply
+// does not become hundreds of stored rows. build turns the buffered text into
+// the event type and payload to emit.
 type deltaStream struct {
 	em    *runs.Emitter
-	base  WriterEvent
-	scene int
+	build func(text string) (string, any)
 	buf   strings.Builder
 	last  time.Time
 }
@@ -351,8 +520,8 @@ const (
 	deltaFlushEvery = 200 * time.Millisecond
 )
 
-func newDeltaStream(em *runs.Emitter, base WriterEvent, scene int) *deltaStream {
-	return &deltaStream{em: em, base: base, scene: scene, last: time.Now()}
+func newDeltaStream(em *runs.Emitter, build func(text string) (string, any)) *deltaStream {
+	return &deltaStream{em: em, build: build, last: time.Now()}
 }
 
 func (d *deltaStream) delta(s string) {
@@ -366,10 +535,8 @@ func (d *deltaStream) flush(ctx context.Context) {
 	if d.buf.Len() == 0 {
 		return
 	}
-	ev := d.base
-	ev.Scene = d.scene
-	ev.Text = d.buf.String()
+	typ, ev := d.build(d.buf.String())
 	d.buf.Reset()
 	d.last = time.Now()
-	_ = d.em.Emit(ctx, EventWriterDelta, ev)
+	_ = d.em.Emit(ctx, typ, ev)
 }

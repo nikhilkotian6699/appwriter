@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Critique, RunStatus } from "./client";
+import type { Critique, Issue, RunStatus } from "./client";
 
 /** Payloads of the run events the server emits (see internal/runs and internal/guild). */
 export type FinishedPayload = {
@@ -31,14 +31,44 @@ export type WriterPayload = {
   usage?: WriterUsage;
 };
 
+/** An issue as carried by editor.done: the stored row without run-level fields. */
+export type EventIssue = Omit<Issue, "run_id" | "content_hash" | "created_at" | "chapter_id" | "decided_at">;
+
+export type EditorPayload = {
+  writer_id: string;
+  slug: string;
+  text?: string;
+  reason?: string;
+  error?: string;
+  fallback: boolean;
+  issues?: EventIssue[];
+  warnings?: string[];
+  usage?: WriterUsage;
+};
+
 export type RunEventMessage =
   | { type: "run.started"; seq: number; payload: { kind: string } }
   | { type: "critique.plan"; seq: number; payload: PlanPayload }
   | { type: "writer.started" | "writer.delta" | "writer.retry" | "writer.done" | "writer.failed"; seq: number; payload: WriterPayload }
+  | { type: "editor.started" | "editor.delta" | "editor.retry" | "editor.done"; seq: number; payload: EditorPayload }
   | { type: "run.finished"; seq: number; payload: FinishedPayload }
   | { type: "end"; seq: number; payload: Record<string, never> };
 
-const EVENT_TYPES = ["run.started", "critique.plan", "writer.started", "writer.delta", "writer.retry", "writer.done", "writer.failed", "run.finished", "end"] as const;
+const EVENT_TYPES = [
+  "run.started",
+  "critique.plan",
+  "writer.started",
+  "writer.delta",
+  "writer.retry",
+  "writer.done",
+  "writer.failed",
+  "editor.started",
+  "editor.delta",
+  "editor.retry",
+  "editor.done",
+  "run.finished",
+  "end",
+] as const;
 
 /**
  * useRunEvents follows a run's Server-Sent Events. The browser's EventSource

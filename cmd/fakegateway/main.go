@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -207,11 +208,17 @@ func (g *gateway) reply(req chatRequest) string {
 		name = gen[i+1:]
 	}
 	switch {
+	case gen == "editor-in-chief":
+		if strings.Contains(req.Model, "invalid") {
+			return "The editor declines to answer in JSON today."
+		}
+		return editorReply(req.Messages)
 	case strings.HasPrefix(gen, "critic:"):
 		if strings.Contains(req.Model, "invalid") {
 			return "I would rather talk about the weather than return JSON."
 		}
 		return critiqueReply(name, req.Messages)
+	case strings.HasPrefix(gen, "test:"):
 		return fmt.Sprintf("I am %s, answering through the fake gateway as the model %q. When I read a chapter I look first for the sentence where the writer stopped trusting the reader, then for the one that earned its place. This reply is canned, so the real voice will have to wait for the real gateway.", name, req.Model)
 	case strings.HasPrefix(gen, "cowrite:"):
 		return "The lamp had been burning since before anyone remembered lighting it. She crossed the room without looking at it, the way you avoid looking at a person who has been talking for too long, and put her hand flat against the window to feel whether the cold outside was the honest kind. It was not. It was the kind that waits."
@@ -290,6 +297,61 @@ func critiqueReply(name string, msgs []message) string {
 		out["bible_conflicts"] = []conflict{{Quote: sentences[3], ConflictsWith: "the story bible's note on this character (canned conflict from the fake gateway)"}}
 	}
 	b, _ := json.MarshalIndent(out, "", "  ")
+	return string(b)
+}
+
+// editorReply merges the critics' notes found in the prompt: source ids are
+// the "[slug/id]" labels, quotes are taken from the chapter text so they
+// validate. The first issue cites two sources to exercise merging.
+func editorReply(msgs []message) string {
+	var prompt string
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == "user" {
+			prompt = msgs[i].Content
+			break
+		}
+	}
+	re := regexp.MustCompile(`\[([a-z0-9-]+/[A-Za-z0-9_-]+)\] (high|medium|low) — quote: "((?:[^"\\]|\\.)*)"`)
+	type src struct{ id, sev, quote string }
+	var sources []src
+	for _, m := range re.FindAllStringSubmatch(prompt, -1) {
+		q, err := strconv.Unquote(`"` + m[3] + `"`)
+		if err != nil {
+			q = m[3]
+		}
+		sources = append(sources, src{m[1], m[2], q})
+	}
+	type issue struct {
+		ID           string   `json:"id"`
+		Severity     string   `json:"severity"`
+		Quote        string   `json:"quote"`
+		Problem      string   `json:"problem"`
+		SuggestedFix string   `json:"suggested_fix"`
+		Sources      []string `json:"sources"`
+	}
+	issues := []issue{}
+	byQuote := map[string][]src{}
+	var order []string
+	for _, s := range sources {
+		if _, ok := byQuote[s.quote]; !ok {
+			order = append(order, s.quote)
+		}
+		byQuote[s.quote] = append(byQuote[s.quote], s)
+	}
+	for i, q := range order {
+		if i >= 5 {
+			break
+		}
+		group := byQuote[q]
+		ids := make([]string, 0, len(group))
+		for _, g := range group {
+			ids = append(ids, g.id)
+		}
+		problem := fmt.Sprintf("%d critic(s) flagged this passage; the fake editor-in-chief agrees it carries more than it needs to.", len(group))
+		issues = append(issues, issue{ID: fmt.Sprintf("e%d", i+1), Severity: group[0].sev, Quote: q, Problem: problem,
+			SuggestedFix: "Trim the sentence to its action and let the reader supply the rest.", Sources: ids})
+	}
+	b, _ := json.MarshalIndent(map[string]any{"issues": issues}, "", "  ")
 	return string(b)
 }
 

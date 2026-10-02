@@ -68,6 +68,28 @@ type Critique struct {
 	FinishedAt       *time.Time
 }
 
+type Issue struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	RunID        uuid.UUID
+	ChapterID    uuid.NullUUID
+	Position     int32
+	Key          string
+	Severity     string
+	Quote        string
+	Problem      string
+	SuggestedFix string
+	QuoteStart   int32
+	QuoteEnd     int32
+	QuoteExact   bool
+	Sources      []byte
+	Decision     string
+	EditedFix    *string
+	DecidedAt    *time.Time
+	ContentHash  string
+	CreatedAt    time.Time
+}
+
 type ModelCall struct {
 	ID               uuid.UUID
 	UserID           uuid.UUID

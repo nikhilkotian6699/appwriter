@@ -352,8 +352,12 @@ paths:
         scene token limit) in parallel; follow them through
         `GET /api/runs/{runId}/events`. Event types: `critique.plan`,
         `writer.started`, `writer.delta`, `writer.retry`, `writer.done`,
-        `writer.failed`, then `run.finished`. The validated critiques are at
-        `GET /api/runs/{runId}/critiques`.
+        `writer.failed`, then the editor-in-chief's `editor.started`,
+        `editor.delta`, `editor.retry`, `editor.done` (with the prioritized
+        list; `fallback` is true when the editor failed and the list was
+        assembled from the critics' notes), then `run.finished`. The validated
+        critiques are at `GET /api/runs/{runId}/critiques` and the prioritized
+        list at `GET /api/runs/{runId}/issues`.
       requestBody:
         required: false
         content:
@@ -381,6 +385,22 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/CritiqueRecord" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/runs/{runId}/issues:
+    parameters:
+      - $ref: "#/components/parameters/runId"
+    get:
+      operationId: listRunIssues
+      summary: The editor-in-chief's prioritized issue list for a critique run
+      responses:
+        "200":
+          description: OK, in priority order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Issue" }
         default: { $ref: "#/components/responses/Error" }
 
   /api/runs/{runId}:
@@ -951,3 +971,45 @@ components:
         cost_estimated: { type: boolean }
         created_at: { type: string, format: date-time }
         finished_at: { type: string, format: date-time }
+
+    IssueDecision:
+      type: string
+      enum: [pending, accepted, rejected]
+
+    IssueSource:
+      type: object
+      description: A critic's note that an issue merges or restates.
+      required: [id, critique_id, writer_id, writer_name, writer_slug, issue_id]
+      properties:
+        id: { type: string, description: "<writer slug>/<issue id>" }
+        critique_id: { type: string, format: uuid }
+        writer_id: { type: string, format: uuid }
+        writer_name: { type: string }
+        writer_slug: { type: string }
+        issue_id: { type: string }
+
+    Issue:
+      type: object
+      description: One entry of the editor-in-chief's prioritized list, with the author's decision.
+      required: [id, run_id, position, key, severity, quote, problem, suggested_fix, start, end, quote_exact, sources, decision, content_hash, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        chapter_id: { type: string, format: uuid }
+        position: { type: integer }
+        key: { type: string, description: The editor's own id, e.g. e1 }
+        severity: { $ref: "#/components/schemas/IssueSeverity" }
+        quote: { type: string }
+        problem: { type: string }
+        suggested_fix: { type: string }
+        start: { type: integer }
+        end: { type: integer }
+        quote_exact: { type: boolean }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/IssueSource" }
+        decision: { $ref: "#/components/schemas/IssueDecision" }
+        edited_fix: { type: string, description: The author's own wording of the fix, when edited }
+        decided_at: { type: string, format: date-time }
+        content_hash: { type: string, description: Hash of the chapter text the critique read }
+        created_at: { type: string, format: date-time }

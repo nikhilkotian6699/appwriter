@@ -154,12 +154,27 @@ text, ids unique) and asks once more on invalid output. Validated critiques,
 with byte offsets of every quote into the chapter, are at
 `GET /api/runs/{id}/critiques`; one failing writer does not fail the run.
 
+When the critics are done, the editor-in-chief (a system writer of the
+account, generation name `editor-in-chief`) receives every validated note
+labelled with a source id (`<writer slug>/<issue id>`), the story bible and
+the chapter, and returns one prioritized list: duplicates merged,
+contradictions resolved in favour of the author's intent, every issue citing
+the critics that raised it. The list is validated like a critique (quotes
+anchored, every issue cites a known source; one retry) and stored in the
+`issues` table, ready for the author's decisions. If the editor-in-chief
+fails, the critics' issues are listed unmerged, most severe first, and the
+run's result says `synthesis: fallback`. Events: `editor.started`,
+`editor.delta`, `editor.retry`, `editor.done`. The list is at
+`GET /api/runs/{id}/issues`.
+
 In the app, "Convene the Guild" on a chapter saves pending edits, lets you
 pick the critics, and opens the Guild panel beside the editor: each critic
 streams into its own card, then shows its overall note, issues with severity,
 quote, problem and fix, and story bible conflicts. Clicking a quote highlights
-the passage in the editor. The panel follows a run across reloads and shows
-the run's tokens and cost (marked "est." when estimated).
+the passage in the editor. The editor-in-chief's list sits at the top of the
+panel with each issue's sources; the critics' notes fold away beneath it. The
+panel follows a run across reloads and shows the run's tokens and cost
+(marked "est." when estimated).
 
 Chapters estimated above the account's scene token limit (Settings) are split
 at scene breaks and headings and critiqued scene by scene; issue ids are then

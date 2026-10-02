@@ -116,6 +116,27 @@ func (e CritiqueStatus) Valid() bool {
 	}
 }
 
+// Defines values for IssueDecision.
+const (
+	Accepted IssueDecision = "accepted"
+	Pending  IssueDecision = "pending"
+	Rejected IssueDecision = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the IssueDecision enum.
+func (e IssueDecision) Valid() bool {
+	switch e {
+	case Accepted:
+		return true
+	case Pending:
+		return true
+	case Rejected:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for IssueSeverity.
 const (
 	High   IssueSeverity = "high"
@@ -413,8 +434,51 @@ type GatewayModels struct {
 	AllModels []string `json:"all_models"`
 }
 
+// Issue One entry of the editor-in-chief's prioritized list, with the author's decision.
+type Issue struct {
+	ChapterId *openapi_types.UUID `json:"chapter_id,omitempty"`
+
+	// ContentHash Hash of the chapter text the critique read
+	ContentHash string        `json:"content_hash"`
+	CreatedAt   time.Time     `json:"created_at"`
+	DecidedAt   *time.Time    `json:"decided_at,omitempty"`
+	Decision    IssueDecision `json:"decision"`
+
+	// EditedFix The author's own wording of the fix
+	EditedFix *string            `json:"edited_fix,omitempty"`
+	End       int                `json:"end"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// Key The editor's own id
+	Key          string             `json:"key"`
+	Position     int                `json:"position"`
+	Problem      string             `json:"problem"`
+	Quote        string             `json:"quote"`
+	QuoteExact   bool               `json:"quote_exact"`
+	RunId        openapi_types.UUID `json:"run_id"`
+	Severity     IssueSeverity      `json:"severity"`
+	Sources      []IssueSource      `json:"sources"`
+	Start        int                `json:"start"`
+	SuggestedFix string             `json:"suggested_fix"`
+}
+
+// IssueDecision defines model for IssueDecision.
+type IssueDecision string
+
 // IssueSeverity defines model for IssueSeverity.
 type IssueSeverity string
+
+// IssueSource A critic's note that an issue merges or restates.
+type IssueSource struct {
+	CritiqueId openapi_types.UUID `json:"critique_id"`
+
+	// Id <writer slug>/<issue id>
+	Id         string             `json:"id"`
+	IssueId    string             `json:"issue_id"`
+	WriterId   openapi_types.UUID `json:"writer_id"`
+	WriterName string             `json:"writer_name"`
+	WriterSlug string             `json:"writer_slug"`
+}
 
 // Me defines model for Me.
 type Me struct {
@@ -720,6 +784,9 @@ type ServerInterface interface {
 	// StreamRunEvents Follow a run as Server-Sent Events
 	// (GET /api/runs/{runId}/events)
 	StreamRunEvents(w http.ResponseWriter, r *http.Request, runId RunId, params StreamRunEventsParams)
+	// ListRunIssues The editor-in-chief's prioritized issue list for a critique run
+	// (GET /api/runs/{runId}/issues)
+	ListRunIssues(w http.ResponseWriter, r *http.Request, runId RunId)
 
 	// (GET /api/settings)
 	GetSettings(w http.ResponseWriter, r *http.Request)
@@ -896,6 +963,12 @@ func (_ Unimplemented) ListRunCritiques(w http.ResponseWriter, r *http.Request, 
 // StreamRunEvents Follow a run as Server-Sent Events
 // (GET /api/runs/{runId}/events)
 func (_ Unimplemented) StreamRunEvents(w http.ResponseWriter, r *http.Request, runId RunId, params StreamRunEventsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListRunIssues The editor-in-chief's prioritized issue list for a critique run
+// (GET /api/runs/{runId}/issues)
+func (_ Unimplemented) ListRunIssues(w http.ResponseWriter, r *http.Request, runId RunId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1671,6 +1744,32 @@ func (siw *ServerInterfaceWrapper) StreamRunEvents(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListRunIssues operation middleware
+func (siw *ServerInterfaceWrapper) ListRunIssues(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRunIssues(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSettings operation middleware
 func (siw *ServerInterfaceWrapper) GetSettings(w http.ResponseWriter, r *http.Request) {
 
@@ -2035,6 +2134,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}/critiques", wrapper.ListRunCritiques)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/runs/{runId}/issues", wrapper.ListRunIssues)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}", wrapper.GetRun)

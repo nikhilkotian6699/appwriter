@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-02 · `develop` at `6cd68b0`
+Last updated: 2026-10-02 (M3 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -15,7 +15,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 |---|-------|--------|--------|
 | 1 | Projects, chapters, editor, story bible, writers, test writer, fake gateway | Done | `d9eb22a` |
 | 2 | Critique workflow: run engine, SSE, parallel critics, JSON validation, Langfuse metadata | Built on 5 feature branches, awaiting merge | see branches |
-| 3 | Editor-in-chief synthesis, issue list, accept/reject | Next | |
+| 3 | Editor-in-chief synthesis, issue list, accept/reject | In progress (editor-in-chief pushed; issue-decisions next) | |
 | 4 | Revision with diff and hunks, bible-keeper proposals | Not started | |
 | 5 | Co-writing workflow and compare mode | Not started | |
 | 6 | Run history, cost and writer stats, settings page | Not started | |
@@ -39,7 +39,7 @@ branch is merged.
 | 2 | `feature/structured-output` | text-tooling | Pushed (awaiting merge) |
 | 2 | `feature/critique-workflow` | run-engine, structured-output | Pushed (awaiting merge) |
 | 2 | `feature/critique-ui` | critique-workflow | Pushed (awaiting merge) |
-| 3 | `feature/editor-in-chief` | critique-workflow | Not started |
+| 3 | `feature/editor-in-chief` | critique-workflow | Pushed (awaiting merge) |
 | 3 | `feature/issue-decisions` | editor-in-chief | Not started |
 | 4 | `feature/word-diff` | — | Not started |
 | 4 | `feature/revision-workflow` | issue-decisions, word-diff | Not started |
@@ -88,9 +88,22 @@ messages `M2: <title> (n/5)`.
   quote in the TipTap editor. Verified in the browser against the container
   and fake gateway.
 
-Milestone 2 is complete pending: (a) merging the five branches to `develop`
-in order, (b) the live check against the real `lumos-chat` gateway (see Open
-items).
+Milestone 2 is complete pending the live check against the real `lumos-chat`
+gateway (see Open items). The user reports all five branches merged.
+
+Milestone 3 (stacked on `feature/critique-ui`, since the merges were not yet
+visible on origin when work started; rebase onto `develop` with
+`git rebase --onto origin/develop origin/feature/critique-ui` once they are):
+
+- `feature/editor-in-chief` is done and pushed: migration 00004 `issues`,
+  editor-in-chief synthesis step inside the critique run (labelled sources,
+  validation with one retry, fallback to the critics' notes when the editor
+  fails), `GET /api/runs/{id}/issues`, editor.* events, Editor-in-chief
+  section at the top of the Guild panel with source chips, fake-gateway editor
+  reply, unit tests (input assembly, output validation, fallback) and
+  integration coverage (merged sources, fallback).
+- Next: `feature/issue-decisions` — accept / reject / edit the fix / undo per
+  issue, `PUT /api/issues/{id}/decision`.
 
 ## Open items
 

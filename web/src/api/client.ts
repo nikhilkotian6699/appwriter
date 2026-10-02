@@ -29,6 +29,9 @@ export type CritiqueIssue = Schemas["CritiqueIssue"];
 export type CritiqueRecord = Schemas["CritiqueRecord"];
 export type CritiqueStatus = Schemas["CritiqueStatus"];
 export type IssueSeverity = Schemas["IssueSeverity"];
+export type Issue = Schemas["Issue"];
+export type IssueSource = Schemas["IssueSource"];
+export type IssueDecision = Schemas["IssueDecision"];
 
 /** ApiError carries the server's stable error code alongside the message. */
 export class ApiError extends Error {

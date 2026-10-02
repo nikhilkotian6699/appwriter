@@ -275,8 +275,12 @@ export interface paths {
          *     scene token limit) in parallel; follow them through
          *     `GET /api/runs/{runId}/events`. Event types: `critique.plan`,
          *     `writer.started`, `writer.delta`, `writer.retry`, `writer.done`,
-         *     `writer.failed`, then `run.finished`. The validated critiques are at
-         *     `GET /api/runs/{runId}/critiques`.
+         *     `writer.failed`, then the editor-in-chief's `editor.started`,
+         *     `editor.delta`, `editor.retry`, `editor.done` (with the prioritized
+         *     list; `fallback` is true when the editor failed and the list was
+         *     assembled from the critics' notes), then `run.finished`. The validated
+         *     critiques are at `GET /api/runs/{runId}/critiques` and the prioritized
+         *     list at `GET /api/runs/{runId}/issues`.
          */
         post: operations["startCritique"];
         delete?: never;
@@ -296,6 +300,25 @@ export interface paths {
         };
         /** The critics' validated replies for a critique run */
         get: operations["listRunCritiques"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        /** The editor-in-chief's prioritized issue list for a critique run */
+        get: operations["listRunIssues"];
         put?: never;
         post?: never;
         delete?: never;
@@ -756,6 +779,49 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             finished_at?: string;
+        };
+        /** @enum {string} */
+        IssueDecision: "pending" | "accepted" | "rejected";
+        /** @description A critic's note that an issue merges or restates. */
+        IssueSource: {
+            /** @description <writer slug>/<issue id> */
+            id: string;
+            /** Format: uuid */
+            critique_id: string;
+            /** Format: uuid */
+            writer_id: string;
+            writer_name: string;
+            writer_slug: string;
+            issue_id: string;
+        };
+        /** @description One entry of the editor-in-chief's prioritized list, with the author's decision. */
+        Issue: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            run_id: string;
+            /** Format: uuid */
+            chapter_id?: string;
+            position: number;
+            /** @description The editor's own id */
+            key: string;
+            severity: components["schemas"]["IssueSeverity"];
+            quote: string;
+            problem: string;
+            suggested_fix: string;
+            start: number;
+            end: number;
+            quote_exact: boolean;
+            sources: components["schemas"]["IssueSource"][];
+            decision: components["schemas"]["IssueDecision"];
+            /** @description The author's own wording of the fix */
+            edited_fix?: string;
+            /** Format: date-time */
+            decided_at?: string;
+            /** @description Hash of the chapter text the critique read */
+            content_hash: string;
+            /** Format: date-time */
+            created_at: string;
         };
     };
     responses: {
@@ -1412,6 +1478,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CritiqueRecord"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRunIssues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK, in priority order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"][];
                 };
             };
             default: components["responses"]["Error"];
