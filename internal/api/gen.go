@@ -155,6 +155,72 @@ func (e DiffOpKind) Valid() bool {
 	}
 }
 
+// Defines values for DraftDecision.
+const (
+	DraftDecisionDiscarded DraftDecision = "discarded"
+	DraftDecisionInserted  DraftDecision = "inserted"
+	DraftDecisionPending   DraftDecision = "pending"
+	DraftDecisionReplaced  DraftDecision = "replaced"
+)
+
+// Valid indicates whether the value is a known member of the DraftDecision enum.
+func (e DraftDecision) Valid() bool {
+	switch e {
+	case DraftDecisionDiscarded:
+		return true
+	case DraftDecisionInserted:
+		return true
+	case DraftDecisionPending:
+		return true
+	case DraftDecisionReplaced:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DraftMode.
+const (
+	Continue  DraftMode = "continue"
+	Selection DraftMode = "selection"
+)
+
+// Valid indicates whether the value is a known member of the DraftMode enum.
+func (e DraftMode) Valid() bool {
+	switch e {
+	case Continue:
+		return true
+	case Selection:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DraftStatus.
+const (
+	DraftStatusCancelled DraftStatus = "cancelled"
+	DraftStatusFailed    DraftStatus = "failed"
+	DraftStatusRunning   DraftStatus = "running"
+	DraftStatusSucceeded DraftStatus = "succeeded"
+)
+
+// Valid indicates whether the value is a known member of the DraftStatus enum.
+func (e DraftStatus) Valid() bool {
+	switch e {
+	case DraftStatusCancelled:
+		return true
+	case DraftStatusFailed:
+		return true
+	case DraftStatusRunning:
+		return true
+	case DraftStatusSucceeded:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for IssueDecision.
 const (
 	IssueDecisionAccepted IssueDecision = "accepted"
@@ -241,19 +307,19 @@ func (e ProposalStatus) Valid() bool {
 
 // Defines values for RevisionStatus.
 const (
-	Applied   RevisionStatus = "applied"
-	Discarded RevisionStatus = "discarded"
-	Proposed  RevisionStatus = "proposed"
+	RevisionStatusApplied   RevisionStatus = "applied"
+	RevisionStatusDiscarded RevisionStatus = "discarded"
+	RevisionStatusProposed  RevisionStatus = "proposed"
 )
 
 // Valid indicates whether the value is a known member of the RevisionStatus enum.
 func (e RevisionStatus) Valid() bool {
 	switch e {
-	case Applied:
+	case RevisionStatusApplied:
 		return true
-	case Discarded:
+	case RevisionStatusDiscarded:
 		return true
-	case Proposed:
+	case RevisionStatusProposed:
 		return true
 	default:
 		return false
@@ -502,6 +568,25 @@ type ChapterVersionSummary struct {
 // ChapterVersionSummaryKind defines model for ChapterVersionSummary.Kind.
 type ChapterVersionSummaryKind string
 
+// CowriteStartInput defines model for CowriteStartInput.
+type CowriteStartInput struct {
+	// ContextAfter Text just after
+	ContextAfter *string `json:"context_after,omitempty"`
+
+	// ContextBefore Text just before the cursor or selection
+	ContextBefore *string `json:"context_before,omitempty"`
+	Instruction   string  `json:"instruction"`
+
+	// Notes Scene notes
+	Notes *string `json:"notes,omitempty"`
+
+	// Selection The selected passage; omit to continue from the cursor
+	Selection *string `json:"selection,omitempty"`
+
+	// WriterIds One writer co-writes; two or three compare.
+	WriterIds []openapi_types.UUID `json:"writer_ids"`
+}
+
 // Critique defines model for Critique.
 type Critique struct {
 	BibleConflicts []BibleConflict `json:"bible_conflicts"`
@@ -585,6 +670,51 @@ type DiffStats struct {
 	WordsAdded   int `json:"words_added"`
 	WordsRemoved int `json:"words_removed"`
 }
+
+// Draft One co-writer's draft for a request, with what the author did with it.
+type Draft struct {
+	ChapterId        *openapi_types.UUID `json:"chapter_id,omitempty"`
+	CompletionTokens int                 `json:"completion_tokens"`
+	CostEstimated    bool                `json:"cost_estimated"`
+	CostUsd          float64             `json:"cost_usd"`
+	CreatedAt        time.Time           `json:"created_at"`
+	DecidedAt        *time.Time          `json:"decided_at,omitempty"`
+	Decision         DraftDecision       `json:"decision"`
+	Error            string              `json:"error"`
+	FinishedAt       *time.Time          `json:"finished_at,omitempty"`
+	Id               openapi_types.UUID  `json:"id"`
+	Instruction      string              `json:"instruction"`
+	Mode             DraftMode           `json:"mode"`
+	ModelAlias       string              `json:"model_alias"`
+	Notes            string              `json:"notes"`
+	Position         int                 `json:"position"`
+	PromptTokens     int                 `json:"prompt_tokens"`
+	RunId            openapi_types.UUID  `json:"run_id"`
+
+	// Selection The passage the draft was asked to replace
+	Selection string      `json:"selection"`
+	Status    DraftStatus `json:"status"`
+
+	// Text The draft
+	Text       string              `json:"text"`
+	WriterId   *openapi_types.UUID `json:"writer_id,omitempty"`
+	WriterName string              `json:"writer_name"`
+	WriterSlug string              `json:"writer_slug"`
+}
+
+// DraftDecision defines model for DraftDecision.
+type DraftDecision string
+
+// DraftDecisionInput defines model for DraftDecisionInput.
+type DraftDecisionInput struct {
+	Decision DraftDecision `json:"decision"`
+}
+
+// DraftMode defines model for DraftMode.
+type DraftMode string
+
+// DraftStatus defines model for DraftStatus.
+type DraftStatus string
 
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
@@ -871,6 +1001,9 @@ type WriterTestResult struct {
 // ChapterId defines model for chapterId.
 type ChapterId = openapi_types.UUID
 
+// DraftId defines model for draftId.
+type DraftId = openapi_types.UUID
+
 // EntryId defines model for entryId.
 type EntryId = openapi_types.UUID
 
@@ -897,6 +1030,11 @@ type WriterId = openapi_types.UUID
 
 // Error defines model for Error.
 type Error = ErrorResponse
+
+// ListChapterDraftsParams defines parameters for ListChapterDrafts.
+type ListChapterDraftsParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
 
 // ListChapterRevisionsParams defines parameters for ListChapterRevisions.
 type ListChapterRevisionsParams struct {
@@ -939,11 +1077,17 @@ type SaveChapterContentJSONRequestBody = ChapterContentInput
 // StartCritiqueJSONRequestBody defines body for StartCritique for application/json ContentType.
 type StartCritiqueJSONRequestBody = CritiqueStartInput
 
+// StartCowriteJSONRequestBody defines body for StartCowrite for application/json ContentType.
+type StartCowriteJSONRequestBody = CowriteStartInput
+
 // StartRevisionJSONRequestBody defines body for StartRevision for application/json ContentType.
 type StartRevisionJSONRequestBody = RevisionStartInput
 
 // CreateChapterSnapshotJSONRequestBody defines body for CreateChapterSnapshot for application/json ContentType.
 type CreateChapterSnapshotJSONRequestBody = SnapshotInput
+
+// DecideDraftJSONRequestBody defines body for DecideDraft for application/json ContentType.
+type DecideDraftJSONRequestBody = DraftDecisionInput
 
 // DecideIssueJSONRequestBody defines body for DecideIssue for application/json ContentType.
 type DecideIssueJSONRequestBody = IssueDecisionInput
@@ -1004,6 +1148,12 @@ type ServerInterface interface {
 	// StartCritique Convene the Guild on a chapter
 	// (POST /api/chapters/{chapterId}/critiques)
 	StartCritique(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
+	// ListChapterDrafts Recent co-writer drafts of a chapter, newest first
+	// (GET /api/chapters/{chapterId}/drafts)
+	ListChapterDrafts(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterDraftsParams)
+	// StartCowrite Ask one co-writer for a draft, or two or three for drafts to compare
+	// (POST /api/chapters/{chapterId}/drafts)
+	StartCowrite(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
 	// ListChapterRevisions Revisions proposed for a chapter, newest first
 	// (GET /api/chapters/{chapterId}/revisions)
 	ListChapterRevisions(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterRevisionsParams)
@@ -1025,6 +1175,9 @@ type ServerInterface interface {
 	// RestoreChapterVersion Snapshot the current text, then replace it with the version
 	// (POST /api/chapters/{chapterId}/versions/{versionId}/restore)
 	RestoreChapterVersion(w http.ResponseWriter, r *http.Request, chapterId ChapterId, versionId VersionId)
+	// DecideDraft Record what the author did with a draft
+	// (PUT /api/drafts/{draftId}/decision)
+	DecideDraft(w http.ResponseWriter, r *http.Request, draftId DraftId)
 	// ListGatewayModels Aliases known to the gateway
 	// (GET /api/gateway/models)
 	ListGatewayModels(w http.ResponseWriter, r *http.Request)
@@ -1085,6 +1238,9 @@ type ServerInterface interface {
 	// ListRunCritiques The critics' validated replies for a critique run
 	// (GET /api/runs/{runId}/critiques)
 	ListRunCritiques(w http.ResponseWriter, r *http.Request, runId RunId)
+	// ListRunDrafts The drafts a co-write or compare run produced
+	// (GET /api/runs/{runId}/drafts)
+	ListRunDrafts(w http.ResponseWriter, r *http.Request, runId RunId)
 	// StreamRunEvents Follow a run as Server-Sent Events
 	// (GET /api/runs/{runId}/events)
 	StreamRunEvents(w http.ResponseWriter, r *http.Request, runId RunId, params StreamRunEventsParams)
@@ -1174,6 +1330,18 @@ func (_ Unimplemented) StartCritique(w http.ResponseWriter, r *http.Request, cha
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListChapterDrafts Recent co-writer drafts of a chapter, newest first
+// (GET /api/chapters/{chapterId}/drafts)
+func (_ Unimplemented) ListChapterDrafts(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterDraftsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// StartCowrite Ask one co-writer for a draft, or two or three for drafts to compare
+// (POST /api/chapters/{chapterId}/drafts)
+func (_ Unimplemented) StartCowrite(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ListChapterRevisions Revisions proposed for a chapter, newest first
 // (GET /api/chapters/{chapterId}/revisions)
 func (_ Unimplemented) ListChapterRevisions(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterRevisionsParams) {
@@ -1211,6 +1379,12 @@ func (_ Unimplemented) GetChapterVersion(w http.ResponseWriter, r *http.Request,
 // RestoreChapterVersion Snapshot the current text, then replace it with the version
 // (POST /api/chapters/{chapterId}/versions/{versionId}/restore)
 func (_ Unimplemented) RestoreChapterVersion(w http.ResponseWriter, r *http.Request, chapterId ChapterId, versionId VersionId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DecideDraft Record what the author did with a draft
+// (PUT /api/drafts/{draftId}/decision)
+func (_ Unimplemented) DecideDraft(w http.ResponseWriter, r *http.Request, draftId DraftId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1320,6 +1494,12 @@ func (_ Unimplemented) CancelRun(w http.ResponseWriter, r *http.Request, runId R
 // ListRunCritiques The critics' validated replies for a critique run
 // (GET /api/runs/{runId}/critiques)
 func (_ Unimplemented) ListRunCritiques(w http.ResponseWriter, r *http.Request, runId RunId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListRunDrafts The drafts a co-write or compare run produced
+// (GET /api/runs/{runId}/drafts)
+func (_ Unimplemented) ListRunDrafts(w http.ResponseWriter, r *http.Request, runId RunId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1624,6 +1804,74 @@ func (siw *ServerInterfaceWrapper) StartCritique(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListChapterDrafts operation middleware
+func (siw *ServerInterfaceWrapper) ListChapterDrafts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "chapterId" -------------
+	var chapterId ChapterId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "chapterId", chi.URLParam(r, "chapterId"), &chapterId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "chapterId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListChapterDraftsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListChapterDrafts(w, r, chapterId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartCowrite operation middleware
+func (siw *ServerInterfaceWrapper) StartCowrite(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "chapterId" -------------
+	var chapterId ChapterId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "chapterId", chi.URLParam(r, "chapterId"), &chapterId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "chapterId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartCowrite(w, r, chapterId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListChapterRevisions operation middleware
 func (siw *ServerInterfaceWrapper) ListChapterRevisions(w http.ResponseWriter, r *http.Request) {
 
@@ -1873,6 +2121,32 @@ func (siw *ServerInterfaceWrapper) RestoreChapterVersion(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RestoreChapterVersion(w, r, chapterId, versionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DecideDraft operation middleware
+func (siw *ServerInterfaceWrapper) DecideDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "draftId" -------------
+	var draftId DraftId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "draftId", chi.URLParam(r, "draftId"), &draftId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "draftId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DecideDraft(w, r, draftId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2383,6 +2657,32 @@ func (siw *ServerInterfaceWrapper) ListRunCritiques(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListRunDrafts operation middleware
+func (siw *ServerInterfaceWrapper) ListRunDrafts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRunDrafts(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StreamRunEvents operation middleware
 func (siw *ServerInterfaceWrapper) StreamRunEvents(w http.ResponseWriter, r *http.Request) {
 
@@ -2848,6 +3148,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/bible-proposals/{proposalId}", wrapper.DecideBibleProposal)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/chapters/{chapterId}/drafts", wrapper.ListChapterDrafts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/chapters/{chapterId}/drafts", wrapper.StartCowrite)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/runs/{runId}/drafts", wrapper.ListRunDrafts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/drafts/{draftId}/decision", wrapper.DecideDraft)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}", wrapper.GetRun)

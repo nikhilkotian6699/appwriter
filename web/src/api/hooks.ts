@@ -18,6 +18,8 @@ export const keys = {
   revision: (id: string) => ["revisions", id] as const,
   projectProposals: (projectId: string, status?: string) => ["projects", projectId, "proposals", status ?? "all"] as const,
   runProposals: (runId: string) => ["runs", runId, "proposals"] as const,
+  runDrafts: (runId: string) => ["runs", runId, "drafts"] as const,
+  chapterDrafts: (chapterId: string) => ["chapters", chapterId, "drafts"] as const,
   chapterRevisions: (chapterId: string, status?: string) => ["chapters", chapterId, "revisions", status ?? "all"] as const,
   chapterRuns: (chapterId: string, kind?: string) => ["chapters", chapterId, "runs", kind ?? "all"] as const,
 };
@@ -141,5 +143,20 @@ export function useRunBibleProposals(runId: string | null, enabled = true) {
     queryKey: keys.runProposals(runId ?? ""),
     queryFn: () => call(api.GET("/api/runs/{runId}/bible-proposals", { params: { path: { runId: runId! } } })),
     enabled: !!runId && enabled,
+  });
+}
+
+export function useRunDrafts(runId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: keys.runDrafts(runId ?? ""),
+    queryFn: () => call(api.GET("/api/runs/{runId}/drafts", { params: { path: { runId: runId! } } })),
+    enabled: !!runId && enabled,
+  });
+}
+
+export function useChapterDrafts(chapterId: string, limit = 10) {
+  return useQuery({
+    queryKey: keys.chapterDrafts(chapterId),
+    queryFn: () => call(api.GET("/api/chapters/{chapterId}/drafts", { params: { path: { chapterId }, query: { limit } } })),
   });
 }

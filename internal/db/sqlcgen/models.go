@@ -88,6 +88,36 @@ type Critique struct {
 	FinishedAt       *time.Time
 }
 
+type Draft struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	RunID            uuid.UUID
+	ChapterID        uuid.NullUUID
+	WriterID         uuid.NullUUID
+	WriterName       string
+	WriterSlug       string
+	ModelAlias       string
+	Mode             string
+	Instruction      string
+	Selection        string
+	Notes            string
+	ContextBefore    string
+	ContextAfter     string
+	ContentHash      string
+	Status           string
+	Text             string
+	Error            string
+	Decision         string
+	DecidedAt        *time.Time
+	Position         int32
+	PromptTokens     int32
+	CompletionTokens int32
+	CostUsd          float64
+	CostEstimated    bool
+	CreatedAt        time.Time
+	FinishedAt       *time.Time
+}
+
 type Issue struct {
 	ID           uuid.UUID
 	UserID       uuid.UUID

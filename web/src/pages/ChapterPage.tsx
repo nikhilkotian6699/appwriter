@@ -2,14 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/react";
-import { api, ApiError, call, type Chapter } from "../api/client";
-import { keys, useChapter, useChapterRevisions, useChapterRuns, useProject } from "../api/hooks";
+import { api, ApiError, call, type Chapter, type Draft } from "../api/client";
+import { keys, useChapter, useChapterDrafts, useChapterRevisions, useChapterRuns, useProject } from "../api/hooks";
 import { ChapterEditor } from "../components/editor/ChapterEditor";
 import { highlightQuote } from "../components/editor/issueHighlight";
 import { ConveneDialog } from "../components/guild/ConveneDialog";
 import { GuildPanel } from "../components/guild/GuildPanel";
 import { RevisionSection } from "../components/guild/RevisionSection";
 import { BibleKeeperSection } from "../components/guild/BibleKeeperSection";
+import { CowriteDialog, type CowriteContext } from "../components/guild/CowriteDialog";
+import { DraftSection } from "../components/guild/DraftSection";
 import { VersionsPanel } from "../components/VersionsPanel";
 import { Button, ErrorBanner, Spinner } from "../components/ui";
 import { wordCount } from "../lib/format";
@@ -36,6 +38,10 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [revisionRunId, setRevisionRunId] = useState<string | null>(null);
   const [bibleRunId, setBibleRunId] = useState<string | null>(null);
+  const [cowriting, setCowriting] = useState(false);
+  const [cowriteRunId, setCowriteRunId] = useState<string | null>(null);
+  const [cowriteContext, setCowriteContext] = useState<CowriteContext & { before: string; after: string }>({ selection: "", selectionWords: 0, before: "", after: "" });
+  const cowriteRangeRef = useRef<{ from: number; to: number } | null>(null);
   const [currentHash, setCurrentHash] = useState(initial.content_hash);
   const [words, setWords] = useState(wordCount(initial.content_md));
   const [editorKey, setEditorKey] = useState(0);
@@ -212,6 +218,71 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
     [chapterId, qc],
   );
 
+  // Co-writing: capture the selection and its surroundings when the dialog opens.
+  const openCowrite = () => {
+    const ed = editorRef.current;
+    if (ed) {
+      const { from, to } = ed.state.selection;
+      const doc = ed.state.doc;
+      cowriteRangeRef.current = { from, to };
+      const selection = from < to ? doc.textBetween(from, to, "\n\n") : "";
+      setCowriteContext({
+        selection,
+        selectionWords: wordCount(selection),
+        before: doc.textBetween(Math.max(0, from - 2000), from, "\n\n"),
+        after: doc.textBetween(to, Math.min(doc.content.size, to + 800), "\n\n"),
+      });
+    }
+    setCowriting(true);
+  };
+  const cowrite = useMutation({
+    mutationFn: async (v: { writerIds: string[]; instruction: string; notes: string }) => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      await save();
+      if (currentRef.current !== lastSavedRef.current) throw new ApiError(0, "unsaved", "The chapter could not be saved; fix that before asking for a draft.");
+      return call(
+        api.POST("/api/chapters/{chapterId}/drafts", {
+          params: { path: { chapterId } },
+          body: {
+            writer_ids: v.writerIds,
+            instruction: v.instruction,
+            selection: cowriteContext.selection || undefined,
+            notes: v.notes || undefined,
+            context_before: cowriteContext.before,
+            context_after: cowriteContext.after,
+          },
+        }),
+      );
+    },
+    onSuccess: (run) => {
+      setCowriteRunId(run.id);
+      setPanel("guild");
+      setCowriting(false);
+      qc.invalidateQueries({ queryKey: keys.chapterDrafts(chapterId) });
+    },
+  });
+  // Drafts of an earlier session: reattach to the latest run that still has something to decide.
+  const recentDrafts = useChapterDrafts(chapterId, 5);
+  useEffect(() => {
+    const latest = recentDrafts.data?.[0];
+    if (latest && !cowriteRunId && (latest.status === "running" || latest.decision === "pending")) setCowriteRunId(latest.run_id);
+  }, [recentDrafts.data, cowriteRunId]);
+  const insertDraft = useCallback((draft: Draft, how: "insert" | "replace"): boolean => {
+    const ed = editorRef.current;
+    if (!ed) return false;
+    const size = ed.state.doc.content.size;
+    const sel = ed.state.selection;
+    let range: { from: number; to: number };
+    if (how === "replace") {
+      range = sel.from < sel.to ? { from: sel.from, to: sel.to } : (cowriteRangeRef.current ?? { from: sel.from, to: sel.to });
+    } else {
+      range = { from: sel.to, to: sel.to };
+    }
+    range = { from: Math.min(range.from, size), to: Math.min(range.to, size) };
+    ed.chain().focus().insertContentAt(range, draft.text, { contentType: "markdown" }).run();
+    return true;
+  }, []);
+
   const onHighlight = useCallback((quote: string) => {
     const editor = editorRef.current;
     return editor ? highlightQuote(editor, quote) : false;
@@ -270,11 +341,14 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
           <Button size="sm" onClick={() => setPanel((p) => (p === "history" ? null : "history"))} aria-pressed={panel === "history"}>
             History
           </Button>
-          {activeRunId && (
+          {(activeRunId || cowriteRunId) && (
             <Button size="sm" onClick={() => setPanel((p) => (p === "guild" ? null : "guild"))} aria-pressed={panel === "guild"}>
               Guild
             </Button>
           )}
+          <Button size="sm" onClick={openCowrite} disabled={cowrite.isPending} title="Ask a co-writer for a draft: for the selected passage, or continuing from the cursor">
+            Co-write
+          </Button>
           <Button size="sm" variant="primary" onClick={() => setConvening(true)} disabled={guildRunning} title={guildRunning ? "The Guild is still in session" : "Ask the critics to read this chapter"}>
             Convene the Guild
           </Button>
@@ -292,14 +366,16 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
           <ChapterEditor key={editorKey} initialMarkdown={loaded} onReady={onReady} onChange={onChange} />
         </div>
         {panel === "history" && <VersionsPanel chapterId={chapterId} onRestored={applyServerContent} />}
-        {panel === "guild" && activeRunId && (
+        {panel === "guild" && (activeRunId || cowriteRunId) && (
           <aside aria-label="The Guild" className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
             <h2 className="mb-2 font-semibold text-stone-900">The Guild</h2>
             <ErrorBanner error={revise.error} />
             <div className="mb-3 space-y-3">
+              {cowriteRunId && <DraftSection key={cowriteRunId} runId={cowriteRunId} onInsert={insertDraft} onAskAgain={openCowrite} />}
               {bibleRunId && <BibleKeeperSection key={bibleRunId} runId={bibleRunId} projectId={initial.project_id} />}
               <RevisionSection key={revisionRunId ?? pendingRevision?.id ?? "none"} runId={revisionRunId} pending={pendingRevision} chapterId={chapterId} onApplied={onRevisionApplied} />
             </div>
+            {activeRunId && (
             <GuildPanel
               key={activeRunId}
               runId={activeRunId}
@@ -309,10 +385,20 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
               onRevise={() => revise.mutate()}
               revising={revise.isPending}
             />
+            )}
           </aside>
         )}
       </div>
       <ConveneDialog open={convening} busy={convene.isPending} error={convene.error} onClose={() => setConvening(false)} onStart={(ids) => convene.mutate(ids)} />
+      <CowriteDialog
+        open={cowriting}
+        busy={cowrite.isPending}
+        error={cowrite.error}
+        context={cowriteContext}
+        maxWriters={1}
+        onClose={() => setCowriting(false)}
+        onStart={(writerIds, instruction, notes) => cowrite.mutate({ writerIds, instruction, notes })}
+      />
     </div>
   );
 }

@@ -71,6 +71,17 @@ export type BiblePayload = {
   usage?: WriterUsage;
 };
 
+export type DraftPayload = {
+  draft_id: string;
+  writer_id: string;
+  slug: string;
+  name: string;
+  text?: string;
+  reason?: string;
+  error?: string;
+  usage?: WriterUsage;
+};
+
 export type RunEventMessage =
   | { type: "run.started"; seq: number; payload: { kind: string } }
   | { type: "critique.plan"; seq: number; payload: PlanPayload }
@@ -78,6 +89,7 @@ export type RunEventMessage =
   | { type: "editor.started" | "editor.delta" | "editor.retry" | "editor.done"; seq: number; payload: EditorPayload }
   | { type: "revision.started" | "revision.delta" | "revision.retry" | "revision.done"; seq: number; payload: RevisionPayload }
   | { type: "bible.started" | "bible.delta" | "bible.retry" | "bible.done"; seq: number; payload: BiblePayload }
+  | { type: "draft.started" | "draft.delta" | "draft.retry" | "draft.done" | "draft.failed"; seq: number; payload: DraftPayload }
   | { type: "run.finished"; seq: number; payload: FinishedPayload }
   | { type: "end"; seq: number; payload: Record<string, never> };
 
@@ -101,6 +113,11 @@ const EVENT_TYPES = [
   "bible.delta",
   "bible.retry",
   "bible.done",
+  "draft.started",
+  "draft.delta",
+  "draft.retry",
+  "draft.done",
+  "draft.failed",
   "run.finished",
   "end",
 ] as const;

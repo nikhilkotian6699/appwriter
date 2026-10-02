@@ -535,6 +535,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chapters/{chapterId}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        /** Recent co-writer drafts of a chapter, newest first */
+        get: operations["listChapterDrafts"];
+        put?: never;
+        /**
+         * Ask one co-writer for a draft, or two or three for drafts to compare
+         * @description Starts a co-write run (one writer) or a compare run (two or three
+         *     writers, same request) in the background and returns it at once. With
+         *     `selection` the writers propose text to take the passage's place;
+         *     without it they continue from the cursor using `context_before` and
+         *     `context_after`. Events: `draft.started`, `draft.delta`,
+         *     `draft.retry`, `draft.done` (with the whole draft), `draft.failed`,
+         *     then `run.finished`. Drafts are at `GET /api/runs/{runId}/drafts`.
+         */
+        post: operations["startCowrite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        /** The drafts a co-write or compare run produced */
+        get: operations["listRunDrafts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draftId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["draftId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Record what the author did with a draft
+         * @description `inserted` and `replaced` record that the text went into the chapter
+         *     (the editor does the insertion); `discarded` sets it aside; `pending`
+         *     takes a discarded draft back. `replaced` is only valid for a draft
+         *     made from a selection.
+         */
+        put: operations["decideDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{runId}": {
         parameters: {
             query?: never;
@@ -1165,6 +1238,64 @@ export interface components {
              */
             revision_id?: string;
         };
+        /** @enum {string} */
+        DraftMode: "selection" | "continue";
+        /** @enum {string} */
+        DraftDecision: "pending" | "inserted" | "replaced" | "discarded";
+        /** @enum {string} */
+        DraftStatus: "running" | "succeeded" | "failed" | "cancelled";
+        /** @description One co-writer's draft for a request, with what the author did with it. */
+        Draft: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            run_id: string;
+            /** Format: uuid */
+            chapter_id?: string;
+            /** Format: uuid */
+            writer_id?: string;
+            writer_name: string;
+            writer_slug: string;
+            model_alias: string;
+            mode: components["schemas"]["DraftMode"];
+            instruction: string;
+            /** @description The passage the draft was asked to replace */
+            selection: string;
+            notes: string;
+            status: components["schemas"]["DraftStatus"];
+            /** @description The draft */
+            text: string;
+            error: string;
+            decision: components["schemas"]["DraftDecision"];
+            /** Format: date-time */
+            decided_at?: string;
+            position: number;
+            prompt_tokens: number;
+            completion_tokens: number;
+            /** Format: double */
+            cost_usd: number;
+            cost_estimated: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at?: string;
+        };
+        CowriteStartInput: {
+            /** @description One writer co-writes; two or three compare. */
+            writer_ids: string[];
+            instruction: string;
+            /** @description The selected passage; omit to continue from the cursor */
+            selection?: string;
+            /** @description Scene notes */
+            notes?: string;
+            /** @description Text just before the cursor or selection */
+            context_before?: string;
+            /** @description Text just after */
+            context_after?: string;
+        };
+        DraftDecisionInput: {
+            decision: components["schemas"]["DraftDecision"];
+        };
     };
     responses: {
         /** @description Error */
@@ -1187,6 +1318,7 @@ export interface components {
         issueId: string;
         revisionId: string;
         proposalId: string;
+        draftId: string;
     };
     requestBodies: never;
     headers: never;
@@ -2102,6 +2234,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BibleProposal"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listChapterDrafts: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    startCowrite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CowriteStartInput"];
+            };
+        };
+        responses: {
+            /** @description The run that was started */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRunDrafts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    decideDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draftId: components["parameters"]["draftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description The draft after the decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
                 };
             };
             default: components["responses"]["Error"];

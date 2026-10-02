@@ -166,6 +166,21 @@ and shown at the top of the story bible page; the Guild panel shows the
 keeper's proposals right after the revision. Events: `bible.started`,
 `bible.delta`, `bible.retry`, `bible.done`.
 
+### Co-writing (Workflow 2)
+
+"Co-write" on a chapter asks one writer with the co-writer role for a draft
+(`POST /api/chapters/{id}/drafts`). With a selection in the editor the writer
+proposes text to take the passage's place; without one it continues from the
+cursor, reading the text just before and after it. The instruction is free
+text (presets: draft this scene, continue from here, rewrite this dialogue,
+tighten this passage, give me 3 alternative openings), scene notes are
+optional, and the story bible and the chapter go along. The draft streams
+into the Guild panel in the writer's voice (`draft.started`, `draft.delta`,
+`draft.retry`, `draft.done` / `draft.failed`); the author inserts it at the
+cursor, replaces the selection, or discards it, and can take a discarded
+draft back. Drafts and decisions are stored (`drafts` table,
+`PUT /api/drafts/{id}/decision`), which the writer stats use later.
+
 ### Runs and event streams
 
 Every workflow is a run (`runs` table) executed in the background by the run

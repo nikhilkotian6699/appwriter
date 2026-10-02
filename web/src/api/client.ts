@@ -43,6 +43,10 @@ export type BibleProposal = Schemas["BibleProposal"];
 export type ProposalAction = Schemas["ProposalAction"];
 export type ProposalStatus = Schemas["ProposalStatus"];
 export type BibleProposalDecisionInput = Schemas["BibleProposalDecisionInput"];
+export type Draft = Schemas["Draft"];
+export type DraftMode = Schemas["DraftMode"];
+export type DraftDecision = Schemas["DraftDecision"];
+export type CowriteStartInput = Schemas["CowriteStartInput"];
 
 /** ApiError carries the server's stable error code alongside the message. */
 export class ApiError extends Error {

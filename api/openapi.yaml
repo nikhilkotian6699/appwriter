@@ -619,6 +619,90 @@ paths:
               schema: { $ref: "#/components/schemas/BibleProposal" }
         default: { $ref: "#/components/responses/Error" }
 
+  /api/chapters/{chapterId}/drafts:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+    get:
+      operationId: listChapterDrafts
+      summary: Recent co-writer drafts of a chapter, newest first
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Draft" }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: startCowrite
+      summary: Ask one co-writer for a draft, or two or three for drafts to compare
+      description: |
+        Starts a co-write run (one writer) or a compare run (two or three
+        writers, same request) in the background and returns it at once. With
+        `selection` the writers propose text to take the passage's place;
+        without it they continue from the cursor using `context_before` and
+        `context_after`. Events: `draft.started`, `draft.delta`,
+        `draft.retry`, `draft.done` (with the whole draft), `draft.failed`,
+        then `run.finished`. Drafts are at `GET /api/runs/{runId}/drafts`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CowriteStartInput" }
+      responses:
+        "202":
+          description: The run that was started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/runs/{runId}/drafts:
+    parameters:
+      - $ref: "#/components/parameters/runId"
+    get:
+      operationId: listRunDrafts
+      summary: The drafts a co-write or compare run produced
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Draft" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/drafts/{draftId}/decision:
+    parameters:
+      - $ref: "#/components/parameters/draftId"
+    put:
+      operationId: decideDraft
+      summary: Record what the author did with a draft
+      description: |
+        `inserted` and `replaced` record that the text went into the chapter
+        (the editor does the insertion); `discarded` sets it aside; `pending`
+        takes a discarded draft back. `replaced` is only valid for a draft
+        made from a selection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DraftDecisionInput" }
+      responses:
+        "200":
+          description: The draft after the decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Draft" }
+        default: { $ref: "#/components/responses/Error" }
+
   /api/runs/{runId}:
     parameters:
       - $ref: "#/components/parameters/runId"
@@ -805,6 +889,11 @@ components:
       schema: { type: string, format: uuid }
     proposalId:
       name: proposalId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    draftId:
+      name: draftId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1399,3 +1488,66 @@ components:
       type: object
       properties:
         revision_id: { type: string, format: uuid, description: The applied revision whose changes the keeper should consider }
+
+    DraftMode:
+      type: string
+      enum: [selection, continue]
+
+    DraftDecision:
+      type: string
+      enum: [pending, inserted, replaced, discarded]
+
+    DraftStatus:
+      type: string
+      enum: [running, succeeded, failed, cancelled]
+
+    Draft:
+      type: object
+      description: One co-writer's draft for a request, with what the author did with it.
+      required: [id, run_id, writer_name, writer_slug, model_alias, mode, instruction, selection, notes, status, text, error, decision, position, prompt_tokens, completion_tokens, cost_usd, cost_estimated, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        chapter_id: { type: string, format: uuid }
+        writer_id: { type: string, format: uuid }
+        writer_name: { type: string }
+        writer_slug: { type: string }
+        model_alias: { type: string }
+        mode: { $ref: "#/components/schemas/DraftMode" }
+        instruction: { type: string }
+        selection: { type: string, description: The passage the draft was asked to replace, when any }
+        notes: { type: string }
+        status: { $ref: "#/components/schemas/DraftStatus" }
+        text: { type: string, description: The draft, in Markdown }
+        error: { type: string }
+        decision: { $ref: "#/components/schemas/DraftDecision" }
+        decided_at: { type: string, format: date-time }
+        position: { type: integer }
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        cost_usd: { type: number, format: double }
+        cost_estimated: { type: boolean }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+
+    CowriteStartInput:
+      type: object
+      required: [writer_ids, instruction]
+      properties:
+        writer_ids:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items: { type: string, format: uuid }
+          description: One writer co-writes; two or three compare.
+        instruction: { type: string, minLength: 1, maxLength: 2000 }
+        selection: { type: string, maxLength: 60000, description: The selected passage; omit to continue from the cursor }
+        notes: { type: string, maxLength: 4000, description: Scene notes, optional }
+        context_before: { type: string, maxLength: 20000, description: Text just before the cursor or selection }
+        context_after: { type: string, maxLength: 20000, description: Text just after }
+
+    DraftDecisionInput:
+      type: object
+      required: [decision]
+      properties:
+        decision: { $ref: "#/components/schemas/DraftDecision" }
