@@ -35,7 +35,7 @@ branch is merged.
 | any | `feature/ci` | — | Not started |
 | any | `feature/guide-content` | — | Not started |
 | 2 | `feature/run-engine` | — | Pushed (awaiting merge) |
-| 2 | `feature/text-tooling` | — | Not started |
+| 2 | `feature/text-tooling` | — | Pushed (awaiting merge) |
 | 2 | `feature/structured-output` | text-tooling | Not started |
 | 2 | `feature/critique-workflow` | run-engine, structured-output | Not started |
 | 2 | `feature/critique-ui` | critique-workflow | Not started |
@@ -68,7 +68,10 @@ messages `M2: <title> (n/5)`.
 - `feature/run-engine` is done and pushed: background engine, numbered
   `run_events`, SSE replay with `Last-Event-ID`, cancel, chapter run list,
   `RUN_TIMEOUT_SECONDS`.
-- Next: `feature/text-tooling`.
+- `feature/text-tooling` is done and pushed: token estimation, scene
+  splitting at breaks/headings with paragraph fallback, quote anchoring that
+  tolerates curly quotes, dashes, whitespace and Markdown markers.
+- Next: `feature/structured-output`.
 
 ## Open items
 
