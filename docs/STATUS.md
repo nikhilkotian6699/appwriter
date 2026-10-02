@@ -16,7 +16,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 1 | Projects, chapters, editor, story bible, writers, test writer, fake gateway | Done | `d9eb22a` |
 | 2 | Critique workflow: run engine, SSE, parallel critics, JSON validation, Langfuse metadata | Built on 5 feature branches, awaiting merge | see branches |
 | 3 | Editor-in-chief synthesis, issue list, accept/reject | Built on 2 feature branches, awaiting merge | see branches |
-| 4 | Revision with diff and hunks, bible-keeper proposals | Next | |
+| 4 | Revision with diff and hunks, bible-keeper proposals | In progress (word-diff pushed) | |
 | 5 | Co-writing workflow and compare mode | Not started | |
 | 6 | Run history, cost and writer stats, settings page | Not started | |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Not started | |
@@ -41,7 +41,7 @@ branch is merged.
 | 2 | `feature/critique-ui` | critique-workflow | Pushed (awaiting merge) |
 | 3 | `feature/editor-in-chief` | critique-workflow | Pushed (awaiting merge) |
 | 3 | `feature/issue-decisions` | editor-in-chief | Pushed (awaiting merge) |
-| 4 | `feature/word-diff` | — | Not started |
+| 4 | `feature/word-diff` | — | Pushed (awaiting merge) |
 | 4 | `feature/revision-workflow` | issue-decisions, word-diff | Not started |
 | 4 | `feature/bible-keeper` | revision-workflow | Not started |
 | 5 | `feature/cowrite` | run-engine | Not started |
@@ -109,8 +109,17 @@ visible on origin when work started; rebase onto `develop` with
   button for milestone 4, integration coverage incl. isolation.
 
 Milestone 3 is complete pending merge (order: editor-in-chief, then
-issue-decisions) and the live gateway check. Next: Milestone 4 on
-`feature/word-diff` (standalone) and `feature/revision-workflow`.
+issue-decisions) and the live gateway check.
+
+Milestone 4 (stacked on `feature/issue-decisions`; the user reports M2 and M3
+merged, origin did not show it yet when work started):
+
+- `feature/word-diff` is done and pushed: `text.Diff` (Myers on word,
+  whitespace and punctuation tokens; nearby changes grouped into hunks with
+  byte offsets, word-level ops and context), `text.ApplyHunks` (apply any
+  subset, rejects a changed base text), `text.Stats`; unit tests incl. round
+  trips and a bounded large rewrite.
+- Next: `feature/revision-workflow`, then `feature/bible-keeper`.
 
 ## Open items
 
