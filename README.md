@@ -154,6 +154,13 @@ text, ids unique) and asks once more on invalid output. Validated critiques,
 with byte offsets of every quote into the chapter, are at
 `GET /api/runs/{id}/critiques`; one failing writer does not fail the run.
 
+In the app, "Convene the Guild" on a chapter saves pending edits, lets you
+pick the critics, and opens the Guild panel beside the editor: each critic
+streams into its own card, then shows its overall note, issues with severity,
+quote, problem and fix, and story bible conflicts. Clicking a quote highlights
+the passage in the editor. The panel follows a run across reloads and shows
+the run's tokens and cost (marked "est." when estimated).
+
 Chapters estimated above the account's scene token limit (Settings) are split
 at scene breaks and headings and critiqued scene by scene; issue ids are then
 prefixed `s1-`, `s2-`, … and offsets still address the whole chapter.

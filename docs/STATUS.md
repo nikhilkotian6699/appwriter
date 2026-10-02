@@ -14,8 +14,8 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | # | Scope | Status | Commit |
 |---|-------|--------|--------|
 | 1 | Projects, chapters, editor, story bible, writers, test writer, fake gateway | Done | `d9eb22a` |
-| 2 | Critique workflow: run engine, SSE, parallel critics, JSON validation, Langfuse metadata | Next | |
-| 3 | Editor-in-chief synthesis, issue list, accept/reject | Not started | |
+| 2 | Critique workflow: run engine, SSE, parallel critics, JSON validation, Langfuse metadata | Built on 5 feature branches, awaiting merge | see branches |
+| 3 | Editor-in-chief synthesis, issue list, accept/reject | Next | |
 | 4 | Revision with diff and hunks, bible-keeper proposals | Not started | |
 | 5 | Co-writing workflow and compare mode | Not started | |
 | 6 | Run history, cost and writer stats, settings page | Not started | |
@@ -38,7 +38,7 @@ branch is merged.
 | 2 | `feature/text-tooling` | — | Pushed (awaiting merge) |
 | 2 | `feature/structured-output` | text-tooling | Pushed (awaiting merge) |
 | 2 | `feature/critique-workflow` | run-engine, structured-output | Pushed (awaiting merge) |
-| 2 | `feature/critique-ui` | critique-workflow | Not started |
+| 2 | `feature/critique-ui` | critique-workflow | Pushed (awaiting merge) |
 | 3 | `feature/editor-in-chief` | critique-workflow | Not started |
 | 3 | `feature/issue-decisions` | editor-in-chief | Not started |
 | 4 | `feature/word-diff` | — | Not started |
@@ -80,14 +80,30 @@ messages `M2: <title> (n/5)`.
   GET /api/runs/{id}/critiques, fake-gateway canned critique, integration
   tests (workflow incl. failing/flaky writer, scenes; cancel). Verified through
   the container against the fake gateway.
-- Next: `feature/critique-ui`.
+- `feature/critique-ui` is done and pushed: Convene dialog (critic picker,
+  default all enabled), Guild panel beside the editor (live streaming cards,
+  validated issues, bible conflicts, warnings, raw reply, cancel, totals with
+  "est." mark, stale-chapter note), EventSource with Last-Event-ID reconnect,
+  auto-reattach to a run in session after reload, issue click highlights the
+  quote in the TipTap editor. Verified in the browser against the container
+  and fake gateway.
+
+Milestone 2 is complete pending: (a) merging the five branches to `develop`
+in order, (b) the live check against the real `lumos-chat` gateway (see Open
+items).
 
 ## Open items
 
-- **M1 live gateway check pending.** `.env` still points `LITELLM_BASE_URL` at
-  the fake gateway because no real `LITELLM_BASE_URL` / `LITELLM_API_KEY` has
-  been supplied. Repeat the M1 live check against the `lumos-chat` alias once
-  they land, before or alongside the M2 live check.
+- **M1 and M2 live gateway checks pending.** `.env` still points
+  `LITELLM_BASE_URL` at the fake gateway because no real `LITELLM_BASE_URL` /
+  `LITELLM_API_KEY` has been supplied. Once they land: run a writer test (M1)
+  and convene the Guild on a chapter (M2) through the container, and check the
+  Langfuse trace carries trace_id, session_id, generation_name `critic:<slug>`,
+  trace_user_id and the tags.
+- **Merge order for M2:** run-engine → text-tooling → structured-output →
+  critique-workflow → critique-ui. Each branch contains the previous ones, so
+  merging in order is clean; after all five, every other `feature/*` branch
+  must be rebased onto `develop` before work starts on it.
 - Until Milestone 7 the app runs as a single bootstrap account with no login
   page.
 

@@ -3,13 +3,17 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/react";
 import { api, ApiError, call, type Chapter } from "../api/client";
-import { keys, useChapter, useProject } from "../api/hooks";
+import { keys, useChapter, useChapterRuns, useProject } from "../api/hooks";
 import { ChapterEditor } from "../components/editor/ChapterEditor";
+import { highlightQuote } from "../components/editor/issueHighlight";
+import { ConveneDialog } from "../components/guild/ConveneDialog";
+import { GuildPanel } from "../components/guild/GuildPanel";
 import { VersionsPanel } from "../components/VersionsPanel";
 import { Button, ErrorBanner, Spinner } from "../components/ui";
 import { wordCount } from "../lib/format";
 
 type SaveStatus = "clean" | "dirty" | "saving" | "saved" | "conflict" | "error";
+type Panel = "guild" | "history" | null;
 
 export default function ChapterPage() {
   const { chapterId = "" } = useParams();
@@ -25,7 +29,10 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
   const [title, setTitle] = useState(initial.title);
   const [status, setStatus] = useState<SaveStatus>("clean");
   const [saveError, setSaveError] = useState<unknown>(null);
-  const [showHistory, setShowHistory] = useState(true);
+  const [panel, setPanel] = useState<Panel>("history");
+  const [convening, setConvening] = useState(false);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [currentHash, setCurrentHash] = useState(initial.content_hash);
   const [words, setWords] = useState(wordCount(initial.content_md));
   const [editorKey, setEditorKey] = useState(0);
   const [loaded, setLoaded] = useState(initial.content_md);
@@ -50,6 +57,7 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
         api.PUT("/api/chapters/{chapterId}/content", { params: { path: { chapterId } }, body: { content_md: md, base_hash: hashRef.current } }),
       );
       hashRef.current = res.chapter.content_hash;
+      setCurrentHash(res.chapter.content_hash);
       lastSavedRef.current = md;
       setSaveError(null);
       setStatus(currentRef.current === md ? "saved" : "dirty");
@@ -127,6 +135,7 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
 
   const applyServerContent = (ch: Chapter) => {
     hashRef.current = ch.content_hash;
+    setCurrentHash(ch.content_hash);
     lastSavedRef.current = null;
     currentRef.current = ch.content_md;
     setLoaded(ch.content_md);
@@ -136,6 +145,38 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
     setWords(wordCount(ch.content_md));
     qc.setQueryData(keys.chapter(chapterId), ch);
   };
+
+  // The latest critique run of this chapter; a run still in session opens the Guild panel at once.
+  const critiqueRuns = useChapterRuns(chapterId, "critique", 1);
+  const latestRun = critiqueRuns.data?.[0];
+  useEffect(() => {
+    if (!latestRun || activeRunId) return;
+    setActiveRunId(latestRun.id);
+    if (latestRun.status === "running") setPanel("guild");
+  }, [latestRun, activeRunId]);
+
+  const convene = useMutation({
+    mutationFn: async (writerIds: string[]) => {
+      // The critics must read what is on screen, so flush any pending edit first.
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      await save();
+      if (currentRef.current !== lastSavedRef.current) throw new ApiError(0, "unsaved", "The chapter could not be saved; fix that before convening the Guild.");
+      return call(api.POST("/api/chapters/{chapterId}/critiques", { params: { path: { chapterId } }, body: { writer_ids: writerIds } }));
+    },
+    onSuccess: (run) => {
+      setActiveRunId(run.id);
+      setPanel("guild");
+      setConvening(false);
+      qc.invalidateQueries({ queryKey: keys.chapterRuns(chapterId, "critique") });
+    },
+  });
+
+  const onHighlight = useCallback((quote: string) => {
+    const editor = editorRef.current;
+    return editor ? highlightQuote(editor, quote) : false;
+  }, []);
+
+  const guildRunning = latestRun?.status === "running" || convene.isPending;
 
   const statusText: Record<SaveStatus, string> = {
     clean: "Saved",
@@ -185,10 +226,15 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
               Reload server version
             </Button>
           )}
-          <Button size="sm" onClick={() => setShowHistory((v) => !v)}>
-            {showHistory ? "Hide history" : "History"}
+          <Button size="sm" onClick={() => setPanel((p) => (p === "history" ? null : "history"))} aria-pressed={panel === "history"}>
+            History
           </Button>
-          <Button size="sm" variant="primary" disabled title="Convene the Guild arrives in milestone 2">
+          {activeRunId && (
+            <Button size="sm" onClick={() => setPanel((p) => (p === "guild" ? null : "guild"))} aria-pressed={panel === "guild"}>
+              Guild
+            </Button>
+          )}
+          <Button size="sm" variant="primary" onClick={() => setConvening(true)} disabled={guildRunning} title={guildRunning ? "The Guild is still in session" : "Ask the critics to read this chapter"}>
             Convene the Guild
           </Button>
         </div>
@@ -200,12 +246,19 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
         </div>
       )}
       <ErrorBanner error={rename.error} />
-      <div className={`grid gap-4 ${showHistory ? "lg:grid-cols-[1fr_20rem]" : ""}`}>
+      <div className={`grid gap-4 ${panel === "history" ? "lg:grid-cols-[1fr_20rem]" : panel === "guild" ? "lg:grid-cols-[1fr_26rem]" : ""}`}>
         <div>
           <ChapterEditor key={editorKey} initialMarkdown={loaded} onReady={onReady} onChange={onChange} />
         </div>
-        {showHistory && <VersionsPanel chapterId={chapterId} onRestored={applyServerContent} />}
+        {panel === "history" && <VersionsPanel chapterId={chapterId} onRestored={applyServerContent} />}
+        {panel === "guild" && activeRunId && (
+          <aside aria-label="The Guild" className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+            <h2 className="mb-2 font-semibold text-stone-900">The Guild</h2>
+            <GuildPanel key={activeRunId} runId={activeRunId} currentHash={currentHash} onHighlight={onHighlight} onConveneAgain={() => setConvening(true)} />
+          </aside>
+        )}
       </div>
+      <ConveneDialog open={convening} busy={convene.isPending} error={convene.error} onClose={() => setConvening(false)} onStart={(ids) => convene.mutate(ids)} />
     </div>
   );
 }

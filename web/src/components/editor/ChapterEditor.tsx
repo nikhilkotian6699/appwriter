@@ -3,6 +3,7 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
 import { Button } from "../ui";
+import { IssueHighlight } from "./issueHighlight";
 
 type Props = {
   /** Markdown as loaded from the server. Changing the key remounts the editor. */
@@ -15,7 +16,7 @@ type Props = {
 /** ChapterEditor is the TipTap editor with Markdown in and out. */
 export function ChapterEditor({ initialMarkdown, onReady, onChange }: Props) {
   const editor = useEditor({
-    extensions: [StarterKit, Markdown],
+    extensions: [StarterKit, Markdown, IssueHighlight],
     content: initialMarkdown,
     contentType: "markdown",
     editorProps: {

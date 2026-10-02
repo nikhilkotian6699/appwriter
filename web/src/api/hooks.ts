@@ -12,6 +12,9 @@ export const keys = {
   versions: (chapterId: string) => ["chapters", chapterId, "versions"] as const,
   bible: (projectId: string) => ["projects", projectId, "bible"] as const,
   writers: ["writers"] as const,
+  run: (id: string) => ["runs", id] as const,
+  runCritiques: (id: string) => ["runs", id, "critiques"] as const,
+  chapterRuns: (chapterId: string, kind?: string) => ["chapters", chapterId, "runs", kind ?? "all"] as const,
 };
 
 export function useMe() {
@@ -73,4 +76,27 @@ export function useBible(projectId: string) {
 
 export function useWriters() {
   return useQuery({ queryKey: keys.writers, queryFn: () => call(api.GET("/api/writers")) });
+}
+
+export function useRun(id: string | null) {
+  return useQuery({
+    queryKey: keys.run(id ?? ""),
+    queryFn: () => call(api.GET("/api/runs/{runId}", { params: { path: { runId: id! } } })),
+    enabled: !!id,
+  });
+}
+
+export function useRunCritiques(id: string | null, enabled = true) {
+  return useQuery({
+    queryKey: keys.runCritiques(id ?? ""),
+    queryFn: () => call(api.GET("/api/runs/{runId}/critiques", { params: { path: { runId: id! } } })),
+    enabled: !!id && enabled,
+  });
+}
+
+export function useChapterRuns(chapterId: string, kind?: "critique" | "revision" | "bible_update" | "cowrite" | "compare" | "writer_test", limit = 20) {
+  return useQuery({
+    queryKey: keys.chapterRuns(chapterId, kind),
+    queryFn: () => call(api.GET("/api/chapters/{chapterId}/runs", { params: { path: { chapterId }, query: { kind, limit } } })),
+  });
 }

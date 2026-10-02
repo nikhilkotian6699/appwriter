@@ -24,6 +24,11 @@ export type Run = Schemas["Run"];
 export type RunKind = Schemas["RunKind"];
 export type RunStatus = Schemas["RunStatus"];
 export type RunEvent = Schemas["RunEvent"];
+export type Critique = Schemas["Critique"];
+export type CritiqueIssue = Schemas["CritiqueIssue"];
+export type CritiqueRecord = Schemas["CritiqueRecord"];
+export type CritiqueStatus = Schemas["CritiqueStatus"];
+export type IssueSeverity = Schemas["IssueSeverity"];
 
 /** ApiError carries the server's stable error code alongside the message. */
 export class ApiError extends Error {
