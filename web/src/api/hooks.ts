@@ -15,6 +15,8 @@ export const keys = {
   run: (id: string) => ["runs", id] as const,
   runCritiques: (id: string) => ["runs", id, "critiques"] as const,
   runIssues: (id: string) => ["runs", id, "issues"] as const,
+  revision: (id: string) => ["revisions", id] as const,
+  chapterRevisions: (chapterId: string, status?: string) => ["chapters", chapterId, "revisions", status ?? "all"] as const,
   chapterRuns: (chapterId: string, kind?: string) => ["chapters", chapterId, "runs", kind ?? "all"] as const,
 };
 
@@ -107,5 +109,20 @@ export function useRunIssues(id: string | null, enabled = true) {
     queryKey: keys.runIssues(id ?? ""),
     queryFn: () => call(api.GET("/api/runs/{runId}/issues", { params: { path: { runId: id! } } })),
     enabled: !!id && enabled,
+  });
+}
+
+export function useRevision(id: string | null) {
+  return useQuery({
+    queryKey: keys.revision(id ?? ""),
+    queryFn: () => call(api.GET("/api/revisions/{revisionId}", { params: { path: { revisionId: id! } } })),
+    enabled: !!id,
+  });
+}
+
+export function useChapterRevisions(chapterId: string, status?: "proposed" | "applied" | "discarded", limit = 5) {
+  return useQuery({
+    queryKey: keys.chapterRevisions(chapterId, status),
+    queryFn: () => call(api.GET("/api/chapters/{chapterId}/revisions", { params: { path: { chapterId }, query: { status, limit } } })),
   });
 }

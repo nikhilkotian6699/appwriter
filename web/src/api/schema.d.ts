@@ -352,6 +352,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chapters/{chapterId}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        /** Revisions proposed for a chapter, newest first */
+        get: operations["listChapterRevisions"];
+        put?: never;
+        /**
+         * Ask the lead writer to apply the accepted issues of a critique run
+         * @description Starts a revision run in the background and returns it at once. The
+         *     lead writer receives the chapter (scene by scene above the scene
+         *     token limit), the story bible and the accepted issues with their
+         *     final fix wording, and returns the revised text; the app diffs it
+         *     against the chapter into word-level hunks and stores a proposed
+         *     revision. Events: `revision.started`, `revision.delta`,
+         *     `revision.retry`, `revision.done` (with the revision id), then
+         *     `run.finished`.
+         */
+        post: operations["startRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/revisions/{revisionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revisionId: components["parameters"]["revisionId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getRevision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/revisions/{revisionId}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revisionId: components["parameters"]["revisionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply all or some hunks of a proposed revision to the chapter
+         * @description Takes a "before revision" snapshot, replaces the chapter text with the
+         *     chosen hunks applied, and marks the revision applied. Fails with 409
+         *     when the chapter changed since the revision was proposed, or when the
+         *     revision was already applied or discarded.
+         */
+        post: operations["applyRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/revisions/{revisionId}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revisionId: components["parameters"]["revisionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discard a proposed revision without touching the chapter */
+        post: operations["discardRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{runId}": {
         parameters: {
             query?: never;
@@ -853,6 +945,77 @@ export interface components {
             /** @description The author's own wording of the fix. Omitted keeps the current value; null or empty clears it. */
             edited_fix?: string | null;
         };
+        /** @enum {string} */
+        RevisionStatus: "proposed" | "applied" | "discarded";
+        DiffOp: {
+            /** @enum {string} */
+            kind: "equal" | "insert" | "delete";
+            text: string;
+        };
+        /** @description One region of change; offsets address the chapter text the revision was computed against. */
+        DiffHunk: {
+            index: number;
+            old_start: number;
+            old_end: number;
+            old_text: string;
+            new_text: string;
+            ops: components["schemas"]["DiffOp"][];
+            context_before: string;
+            context_after: string;
+        };
+        DiffStats: {
+            words_added: number;
+            words_removed: number;
+            hunks: number;
+        };
+        SkippedIssue: {
+            /** Format: uuid */
+            issue_id: string;
+            key: string;
+            quote: string;
+            reason: string;
+        };
+        /** @description A revised text proposed by the lead writer, as word-level hunks over the chapter. */
+        Revision: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            run_id: string;
+            /** Format: uuid */
+            chapter_id: string;
+            /** Format: uuid */
+            critique_run_id?: string;
+            status: components["schemas"]["RevisionStatus"];
+            /** @description True when the chapter changed since the revision was proposed; it can no longer be applied */
+            stale: boolean;
+            base_hash: string;
+            revised_md: string;
+            hunks: components["schemas"]["DiffHunk"][];
+            stats: components["schemas"]["DiffStats"];
+            issue_ids: string[];
+            skipped: components["schemas"]["SkippedIssue"][];
+            applied_hunks?: number[];
+            result_hash: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            decided_at?: string;
+        };
+        RevisionStartInput: {
+            /**
+             * Format: uuid
+             * @description The critique run whose accepted issues to apply
+             */
+            run_id: string;
+        };
+        RevisionApplyInput: {
+            /** @description Hunks to apply; omitted means every hunk. */
+            hunk_indexes?: number[];
+        };
+        RevisionApplyResult: {
+            chapter: components["schemas"]["Chapter"];
+            revision: components["schemas"]["Revision"];
+        };
     };
     responses: {
         /** @description Error */
@@ -873,6 +1036,7 @@ export interface components {
         writerId: string;
         runId: string;
         issueId: string;
+        revisionId: string;
     };
     requestBodies: never;
     headers: never;
@@ -1559,6 +1723,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Issue"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listChapterRevisions: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["RevisionStatus"];
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Revision"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    startRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevisionStartInput"];
+            };
+        };
+        responses: {
+            /** @description The run that was started */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revisionId: components["parameters"]["revisionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Revision"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    applyRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revisionId: components["parameters"]["revisionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RevisionApplyInput"];
+            };
+        };
+        responses: {
+            /** @description The chapter and the revision after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionApplyResult"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    discardRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revisionId: components["parameters"]["revisionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The discarded revision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Revision"];
                 };
             };
             default: components["responses"]["Error"];

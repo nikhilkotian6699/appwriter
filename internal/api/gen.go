@@ -116,6 +116,27 @@ func (e CritiqueStatus) Valid() bool {
 	}
 }
 
+// Defines values for DiffOpKind.
+const (
+	Delete DiffOpKind = "delete"
+	Equal  DiffOpKind = "equal"
+	Insert DiffOpKind = "insert"
+)
+
+// Valid indicates whether the value is a known member of the DiffOpKind enum.
+func (e DiffOpKind) Valid() bool {
+	switch e {
+	case Delete:
+		return true
+	case Equal:
+		return true
+	case Insert:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for IssueDecision.
 const (
 	Accepted IssueDecision = "accepted"
@@ -152,6 +173,27 @@ func (e IssueSeverity) Valid() bool {
 	case Low:
 		return true
 	case Medium:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RevisionStatus.
+const (
+	Applied   RevisionStatus = "applied"
+	Discarded RevisionStatus = "discarded"
+	Proposed  RevisionStatus = "proposed"
+)
+
+// Valid indicates whether the value is a known member of the RevisionStatus enum.
+func (e RevisionStatus) Valid() bool {
+	switch e {
+	case Applied:
+		return true
+	case Discarded:
+		return true
+	case Proposed:
 		return true
 	default:
 		return false
@@ -417,6 +459,34 @@ type CritiqueStartInput struct {
 // CritiqueStatus defines model for CritiqueStatus.
 type CritiqueStatus string
 
+// DiffHunk One region of change; offsets address the chapter text the revision was computed against.
+type DiffHunk struct {
+	ContextAfter  string   `json:"context_after"`
+	ContextBefore string   `json:"context_before"`
+	Index         int      `json:"index"`
+	NewText       string   `json:"new_text"`
+	OldEnd        int      `json:"old_end"`
+	OldStart      int      `json:"old_start"`
+	OldText       string   `json:"old_text"`
+	Ops           []DiffOp `json:"ops"`
+}
+
+// DiffOp defines model for DiffOp.
+type DiffOp struct {
+	Kind DiffOpKind `json:"kind"`
+	Text string     `json:"text"`
+}
+
+// DiffOpKind defines model for DiffOp.Kind.
+type DiffOpKind string
+
+// DiffStats defines model for DiffStats.
+type DiffStats struct {
+	Hunks        int `json:"hunks"`
+	WordsAdded   int `json:"words_added"`
+	WordsRemoved int `json:"words_removed"`
+}
+
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
 	Error struct {
@@ -521,6 +591,51 @@ type ProjectSummary struct {
 	UpdatedAt    time.Time          `json:"updated_at"`
 }
 
+// Revision A revised text proposed by the lead writer, as word-level hunks over the chapter.
+type Revision struct {
+	AppliedHunks  *[]int               `json:"applied_hunks,omitempty"`
+	BaseHash      string               `json:"base_hash"`
+	ChapterId     openapi_types.UUID   `json:"chapter_id"`
+	CreatedAt     time.Time            `json:"created_at"`
+	CritiqueRunId *openapi_types.UUID  `json:"critique_run_id,omitempty"`
+	DecidedAt     *time.Time           `json:"decided_at,omitempty"`
+	Hunks         []DiffHunk           `json:"hunks"`
+	Id            openapi_types.UUID   `json:"id"`
+	IssueIds      []openapi_types.UUID `json:"issue_ids"`
+	ResultHash    string               `json:"result_hash"`
+	RevisedMd     string               `json:"revised_md"`
+	RunId         openapi_types.UUID   `json:"run_id"`
+	Skipped       []SkippedIssue       `json:"skipped"`
+
+	// Stale True when the chapter changed since the revision was proposed; it can no longer be applied
+	Stale  bool           `json:"stale"`
+	Stats  DiffStats      `json:"stats"`
+	Status RevisionStatus `json:"status"`
+}
+
+// RevisionApplyInput defines model for RevisionApplyInput.
+type RevisionApplyInput struct {
+	// HunkIndexes Hunks to apply; omitted means every hunk.
+	HunkIndexes *[]int `json:"hunk_indexes,omitempty"`
+}
+
+// RevisionApplyResult defines model for RevisionApplyResult.
+type RevisionApplyResult struct {
+	Chapter Chapter `json:"chapter"`
+
+	// Revision A revised text proposed by the lead writer, as word-level hunks over the chapter.
+	Revision Revision `json:"revision"`
+}
+
+// RevisionStartInput defines model for RevisionStartInput.
+type RevisionStartInput struct {
+	// RunId The critique run whose accepted issues to apply
+	RunId openapi_types.UUID `json:"run_id"`
+}
+
+// RevisionStatus defines model for RevisionStatus.
+type RevisionStatus string
+
 // Run One workflow execution. params holds what started it, result what it produced.
 type Run struct {
 	ChapterId        *openapi_types.UUID     `json:"chapter_id,omitempty"`
@@ -565,6 +680,14 @@ type Settings struct {
 type SettingsInput struct {
 	AutosaveSnapshotMinutes int `json:"autosave_snapshot_minutes"`
 	SceneTokenLimit         int `json:"scene_token_limit"`
+}
+
+// SkippedIssue defines model for SkippedIssue.
+type SkippedIssue struct {
+	IssueId openapi_types.UUID `json:"issue_id"`
+	Key     string             `json:"key"`
+	Quote   string             `json:"quote"`
+	Reason  string             `json:"reason"`
 }
 
 // SnapshotInput defines model for SnapshotInput.
@@ -650,6 +773,9 @@ type IssueId = openapi_types.UUID
 // ProjectId defines model for projectId.
 type ProjectId = openapi_types.UUID
 
+// RevisionId defines model for revisionId.
+type RevisionId = openapi_types.UUID
+
 // RunId defines model for runId.
 type RunId = openapi_types.UUID
 
@@ -661,6 +787,12 @@ type WriterId = openapi_types.UUID
 
 // Error defines model for Error.
 type Error = ErrorResponse
+
+// ListChapterRevisionsParams defines parameters for ListChapterRevisions.
+type ListChapterRevisionsParams struct {
+	Status *RevisionStatus `form:"status,omitempty" json:"status,omitempty"`
+	Limit  *int            `form:"limit,omitempty" json:"limit,omitempty"`
+}
 
 // ListChapterRunsParams defines parameters for ListChapterRuns.
 type ListChapterRunsParams struct {
@@ -685,6 +817,9 @@ type SaveChapterContentJSONRequestBody = ChapterContentInput
 // StartCritiqueJSONRequestBody defines body for StartCritique for application/json ContentType.
 type StartCritiqueJSONRequestBody = CritiqueStartInput
 
+// StartRevisionJSONRequestBody defines body for StartRevision for application/json ContentType.
+type StartRevisionJSONRequestBody = RevisionStartInput
+
 // CreateChapterSnapshotJSONRequestBody defines body for CreateChapterSnapshot for application/json ContentType.
 type CreateChapterSnapshotJSONRequestBody = SnapshotInput
 
@@ -702,6 +837,9 @@ type CreateBibleEntryJSONRequestBody = BibleEntryInput
 
 // CreateChapterJSONRequestBody defines body for CreateChapter for application/json ContentType.
 type CreateChapterJSONRequestBody = ChapterCreateInput
+
+// ApplyRevisionJSONRequestBody defines body for ApplyRevision for application/json ContentType.
+type ApplyRevisionJSONRequestBody = RevisionApplyInput
 
 // UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
 type UpdateSettingsJSONRequestBody = SettingsInput
@@ -738,6 +876,12 @@ type ServerInterface interface {
 	// StartCritique Convene the Guild on a chapter
 	// (POST /api/chapters/{chapterId}/critiques)
 	StartCritique(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
+	// ListChapterRevisions Revisions proposed for a chapter, newest first
+	// (GET /api/chapters/{chapterId}/revisions)
+	ListChapterRevisions(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterRevisionsParams)
+	// StartRevision Ask the lead writer to apply the accepted issues of a critique run
+	// (POST /api/chapters/{chapterId}/revisions)
+	StartRevision(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
 	// ListChapterRuns Runs of a chapter, newest first
 	// (GET /api/chapters/{chapterId}/runs)
 	ListChapterRuns(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterRunsParams)
@@ -789,6 +933,15 @@ type ServerInterface interface {
 
 	// (POST /api/projects/{projectId}/chapters)
 	CreateChapter(w http.ResponseWriter, r *http.Request, projectId ProjectId)
+
+	// (GET /api/revisions/{revisionId})
+	GetRevision(w http.ResponseWriter, r *http.Request, revisionId RevisionId)
+	// ApplyRevision Apply all or some hunks of a proposed revision to the chapter
+	// (POST /api/revisions/{revisionId}/apply)
+	ApplyRevision(w http.ResponseWriter, r *http.Request, revisionId RevisionId)
+	// DiscardRevision Discard a proposed revision without touching the chapter
+	// (POST /api/revisions/{revisionId}/discard)
+	DiscardRevision(w http.ResponseWriter, r *http.Request, revisionId RevisionId)
 
 	// (GET /api/runs/{runId})
 	GetRun(w http.ResponseWriter, r *http.Request, runId RunId)
@@ -872,6 +1025,18 @@ func (_ Unimplemented) SaveChapterContent(w http.ResponseWriter, r *http.Request
 // StartCritique Convene the Guild on a chapter
 // (POST /api/chapters/{chapterId}/critiques)
 func (_ Unimplemented) StartCritique(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListChapterRevisions Revisions proposed for a chapter, newest first
+// (GET /api/chapters/{chapterId}/revisions)
+func (_ Unimplemented) ListChapterRevisions(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterRevisionsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// StartRevision Ask the lead writer to apply the accepted issues of a critique run
+// (POST /api/chapters/{chapterId}/revisions)
+func (_ Unimplemented) StartRevision(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -963,6 +1128,23 @@ func (_ Unimplemented) ListChapters(w http.ResponseWriter, r *http.Request, proj
 
 // (POST /api/projects/{projectId}/chapters)
 func (_ Unimplemented) CreateChapter(w http.ResponseWriter, r *http.Request, projectId ProjectId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/revisions/{revisionId})
+func (_ Unimplemented) GetRevision(w http.ResponseWriter, r *http.Request, revisionId RevisionId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ApplyRevision Apply all or some hunks of a proposed revision to the chapter
+// (POST /api/revisions/{revisionId}/apply)
+func (_ Unimplemented) ApplyRevision(w http.ResponseWriter, r *http.Request, revisionId RevisionId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DiscardRevision Discard a proposed revision without touching the chapter
+// (POST /api/revisions/{revisionId}/discard)
+func (_ Unimplemented) DiscardRevision(w http.ResponseWriter, r *http.Request, revisionId RevisionId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1223,6 +1405,87 @@ func (siw *ServerInterfaceWrapper) StartCritique(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.StartCritique(w, r, chapterId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListChapterRevisions operation middleware
+func (siw *ServerInterfaceWrapper) ListChapterRevisions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "chapterId" -------------
+	var chapterId ChapterId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "chapterId", chi.URLParam(r, "chapterId"), &chapterId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "chapterId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListChapterRevisionsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListChapterRevisions(w, r, chapterId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartRevision operation middleware
+func (siw *ServerInterfaceWrapper) StartRevision(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "chapterId" -------------
+	var chapterId ChapterId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "chapterId", chi.URLParam(r, "chapterId"), &chapterId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "chapterId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartRevision(w, r, chapterId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1664,6 +1927,84 @@ func (siw *ServerInterfaceWrapper) CreateChapter(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateChapter(w, r, projectId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetRevision operation middleware
+func (siw *ServerInterfaceWrapper) GetRevision(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "revisionId" -------------
+	var revisionId RevisionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "revisionId", chi.URLParam(r, "revisionId"), &revisionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "revisionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRevision(w, r, revisionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApplyRevision operation middleware
+func (siw *ServerInterfaceWrapper) ApplyRevision(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "revisionId" -------------
+	var revisionId RevisionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "revisionId", chi.URLParam(r, "revisionId"), &revisionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "revisionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApplyRevision(w, r, revisionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DiscardRevision operation middleware
+func (siw *ServerInterfaceWrapper) DiscardRevision(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "revisionId" -------------
+	var revisionId RevisionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "revisionId", chi.URLParam(r, "revisionId"), &revisionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "revisionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DiscardRevision(w, r, revisionId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2189,6 +2530,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/issues/{issueId}/decision", wrapper.DecideIssue)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/chapters/{chapterId}/revisions", wrapper.ListChapterRevisions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/chapters/{chapterId}/revisions", wrapper.StartRevision)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/revisions/{revisionId}", wrapper.GetRevision)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/revisions/{revisionId}/apply", wrapper.ApplyRevision)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/revisions/{revisionId}/discard", wrapper.DiscardRevision)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}", wrapper.GetRun)

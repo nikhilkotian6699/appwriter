@@ -128,6 +128,27 @@ TypeScript client are generated from it. Schema changes are goose migrations
 under `internal/db/migrations`, queries are sqlc files under
 `internal/db/queries`.
 
+### Revising with the lead writer
+
+"Revise" on a critique's issue list starts a revision run
+(`POST /api/chapters/{id}/revisions` with the critique run id). The lead
+writer (system agent `lead-writer`) receives the chapter, the story bible and
+the accepted issues with their final wording (the author's edit when there is
+one), scene by scene above the scene token limit, and returns the revised
+text; scenes without accepted issues are never sent. Accepted issues whose
+passage is no longer in the chapter are skipped and reported. The reply is
+checked (not empty, not a summary or an expansion) with one retry, then
+diffed against the chapter into word-level hunks (`internal/text/diff.go`)
+and stored as a proposed revision (`revisions` table).
+
+`GET /api/revisions/{id}` returns the hunks with word-level ops and whether
+the revision is stale (the chapter changed since). `POST .../apply` takes a
+"before revision" snapshot and applies all hunks or the chosen ones;
+`POST .../discard` drops it. A stale or already decided revision cannot be
+applied. In the app the review dialog shows every change before and after,
+side by side, with a checkbox per change: accept all, accept the selected
+ones, or discard.
+
 ### Runs and event streams
 
 Every workflow is a run (`runs` table) executed in the background by the run

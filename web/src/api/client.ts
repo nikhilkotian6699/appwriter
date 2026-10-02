@@ -32,6 +32,13 @@ export type IssueSeverity = Schemas["IssueSeverity"];
 export type Issue = Schemas["Issue"];
 export type IssueSource = Schemas["IssueSource"];
 export type IssueDecision = Schemas["IssueDecision"];
+export type Revision = Schemas["Revision"];
+export type RevisionStatus = Schemas["RevisionStatus"];
+export type DiffHunk = Schemas["DiffHunk"];
+export type DiffOp = Schemas["DiffOp"];
+export type DiffStats = Schemas["DiffStats"];
+export type SkippedIssue = Schemas["SkippedIssue"];
+export type RevisionApplyResult = Schemas["RevisionApplyResult"];
 
 /** ApiError carries the server's stable error code alongside the message. */
 export class ApiError extends Error {

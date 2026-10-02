@@ -126,10 +126,13 @@ type Props = {
   currentHash: string;
   onHighlight: (quote: string) => boolean;
   onConveneAgain: () => void;
+  /** Starts a revision run for this critique's accepted issues. */
+  onRevise: () => void;
+  revising: boolean;
 };
 
 /** GuildPanel follows one critique run: live while it runs, from the records afterwards. */
-export function GuildPanel({ runId, currentHash, onHighlight, onConveneAgain }: Props) {
+export function GuildPanel({ runId, currentHash, onHighlight, onConveneAgain, onRevise, revising }: Props) {
   const qc = useQueryClient();
   const run = useRun(runId);
   const [state, dispatch] = useReducer(reduce, initial);
@@ -242,6 +245,9 @@ export function GuildPanel({ runId, currentHash, onHighlight, onConveneAgain }: 
           deciding={decide.isPending ? (decide.variables?.id ?? null) : null}
           decideError={decide.error}
           onDecide={(id, decision, edited_fix) => decide.mutate({ id, decision, edited_fix })}
+          onRevise={onRevise}
+          revising={revising}
+          stale={stale}
         />
       )}
       {writers.length > 0 && (
@@ -468,6 +474,9 @@ function EditorSection({
   deciding,
   decideError,
   onDecide,
+  onRevise,
+  revising,
+  stale,
 }: {
   editor: EditorState;
   issues?: EventIssue[];
@@ -479,6 +488,9 @@ function EditorSection({
   deciding: string | null;
   decideError: unknown;
   onDecide: (id: string, decision: IssueDecision, edited_fix?: string | null) => void;
+  onRevise: () => void;
+  revising: boolean;
+  stale: boolean;
 }) {
   const [notFound, setNotFound] = useState<string | null>(null);
   const counts = useMemo(() => {
@@ -526,7 +538,20 @@ function EditorSection({
             <span>
               {counts.accepted} accepted · {counts.rejected} rejected · {counts.pending} pending
             </span>
-            <Button size="sm" variant="primary" disabled title="Revise arrives in milestone 4: the lead writer applies the accepted issues">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={counts.accepted === 0 || revising}
+              loading={revising}
+              onClick={onRevise}
+              title={
+                counts.accepted === 0
+                  ? "Accept at least one issue first"
+                  : stale
+                    ? "The chapter changed since this critique; passages that moved are skipped"
+                    : "The lead writer applies the accepted issues and proposes a revision"
+              }
+            >
               Revise ({counts.accepted})
             </Button>
           </div>

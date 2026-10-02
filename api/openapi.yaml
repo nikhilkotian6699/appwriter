@@ -427,6 +427,106 @@ paths:
               schema: { $ref: "#/components/schemas/Issue" }
         default: { $ref: "#/components/responses/Error" }
 
+  /api/chapters/{chapterId}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+    get:
+      operationId: listChapterRevisions
+      summary: Revisions proposed for a chapter, newest first
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/RevisionStatus" }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Revision" }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: startRevision
+      summary: Ask the lead writer to apply the accepted issues of a critique run
+      description: |
+        Starts a revision run in the background and returns it at once. The
+        lead writer receives the chapter (scene by scene above the scene
+        token limit), the story bible and the accepted issues with their
+        final fix wording, and returns the revised text; the app diffs it
+        against the chapter into word-level hunks and stores a proposed
+        revision. Events: `revision.started`, `revision.delta`,
+        `revision.retry`, `revision.done` (with the revision id), then
+        `run.finished`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RevisionStartInput" }
+      responses:
+        "202":
+          description: The run that was started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/revisions/{revisionId}:
+    parameters:
+      - $ref: "#/components/parameters/revisionId"
+    get:
+      operationId: getRevision
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Revision" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/revisions/{revisionId}/apply:
+    parameters:
+      - $ref: "#/components/parameters/revisionId"
+    post:
+      operationId: applyRevision
+      summary: Apply all or some hunks of a proposed revision to the chapter
+      description: |
+        Takes a "before revision" snapshot, replaces the chapter text with the
+        chosen hunks applied, and marks the revision applied. Fails with 409
+        when the chapter changed since the revision was proposed, or when the
+        revision was already applied or discarded.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RevisionApplyInput" }
+      responses:
+        "200":
+          description: The chapter and the revision after the change
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevisionApplyResult" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/revisions/{revisionId}/discard:
+    parameters:
+      - $ref: "#/components/parameters/revisionId"
+    post:
+      operationId: discardRevision
+      summary: Discard a proposed revision without touching the chapter
+      responses:
+        "200":
+          description: The discarded revision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Revision" }
+        default: { $ref: "#/components/responses/Error" }
+
   /api/runs/{runId}:
     parameters:
       - $ref: "#/components/parameters/runId"
@@ -603,6 +703,11 @@ components:
       schema: { type: string, format: uuid }
     issueId:
       name: issueId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    revisionId:
+      name: revisionId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1053,3 +1158,98 @@ components:
           nullable: true
           maxLength: 5000
           description: The author's own wording of the fix. Omitted keeps the current value; null or empty clears it.
+
+    RevisionStatus:
+      type: string
+      enum: [proposed, applied, discarded]
+
+    DiffOp:
+      type: object
+      required: [kind, text]
+      properties:
+        kind: { type: string, enum: [equal, insert, delete] }
+        text: { type: string }
+
+    DiffHunk:
+      type: object
+      description: One region of change; offsets address the chapter text the revision was computed against.
+      required: [index, old_start, old_end, old_text, new_text, ops, context_before, context_after]
+      properties:
+        index: { type: integer }
+        old_start: { type: integer }
+        old_end: { type: integer }
+        old_text: { type: string }
+        new_text: { type: string }
+        ops:
+          type: array
+          items: { $ref: "#/components/schemas/DiffOp" }
+        context_before: { type: string }
+        context_after: { type: string }
+
+    DiffStats:
+      type: object
+      required: [words_added, words_removed, hunks]
+      properties:
+        words_added: { type: integer }
+        words_removed: { type: integer }
+        hunks: { type: integer }
+
+    SkippedIssue:
+      type: object
+      required: [issue_id, key, quote, reason]
+      properties:
+        issue_id: { type: string, format: uuid }
+        key: { type: string }
+        quote: { type: string }
+        reason: { type: string }
+
+    Revision:
+      type: object
+      description: A revised text proposed by the lead writer, as word-level hunks over the chapter.
+      required: [id, run_id, chapter_id, status, stale, base_hash, revised_md, hunks, stats, issue_ids, skipped, result_hash, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        chapter_id: { type: string, format: uuid }
+        critique_run_id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/RevisionStatus" }
+        stale: { type: boolean, description: True when the chapter changed since the revision was proposed; it can no longer be applied }
+        base_hash: { type: string }
+        revised_md: { type: string }
+        hunks:
+          type: array
+          items: { $ref: "#/components/schemas/DiffHunk" }
+        stats: { $ref: "#/components/schemas/DiffStats" }
+        issue_ids:
+          type: array
+          items: { type: string, format: uuid }
+        skipped:
+          type: array
+          items: { $ref: "#/components/schemas/SkippedIssue" }
+        applied_hunks:
+          type: array
+          items: { type: integer }
+        result_hash: { type: string }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+
+    RevisionStartInput:
+      type: object
+      required: [run_id]
+      properties:
+        run_id: { type: string, format: uuid, description: The critique run whose accepted issues to apply }
+
+    RevisionApplyInput:
+      type: object
+      properties:
+        hunk_indexes:
+          type: array
+          description: Hunks to apply; omitted means every hunk.
+          items: { type: integer }
+
+    RevisionApplyResult:
+      type: object
+      required: [chapter, revision]
+      properties:
+        chapter: { $ref: "#/components/schemas/Chapter" }
+        revision: { $ref: "#/components/schemas/Revision" }

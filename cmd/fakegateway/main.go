@@ -208,6 +208,8 @@ func (g *gateway) reply(req chatRequest) string {
 		name = gen[i+1:]
 	}
 	switch {
+	case gen == "lead-writer":
+		return leadWriterReply(req.Messages)
 	case gen == "editor-in-chief":
 		if strings.Contains(req.Model, "invalid") {
 			return "The editor declines to answer in JSON today."
@@ -298,6 +300,46 @@ func critiqueReply(name string, msgs []message) string {
 	}
 	b, _ := json.MarshalIndent(out, "", "  ")
 	return string(b)
+}
+
+// leadWriterReply applies the accepted notes found in the prompt by
+// tightening each quoted passage: the word before the last one is dropped,
+// so the change stays inside the sentence the author accepted.
+func leadWriterReply(msgs []message) string {
+	var prompt string
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == "user" {
+			prompt = msgs[i].Content
+			break
+		}
+	}
+	chapter := prompt
+	if a := strings.Index(prompt, "--- CHAPTER TEXT BEGIN ---"); a >= 0 {
+		chapter = prompt[a+len("--- CHAPTER TEXT BEGIN ---\n"):]
+		if b := strings.Index(chapter, "--- CHAPTER TEXT END ---"); b >= 0 {
+			chapter = chapter[:b]
+		}
+	}
+	re := regexp.MustCompile(`passage: ("(?:[^"\\]|\\.)*")`)
+	for _, m := range re.FindAllStringSubmatch(prompt, -1) {
+		q, err := strconv.Unquote(m[1])
+		if err != nil {
+			continue
+		}
+		chapter = strings.Replace(chapter, q, tightenSentence(q), 1)
+	}
+	return chapter
+}
+
+// tightenSentence drops the second-to-last word of a sentence of four or
+// more words, keeping its final punctuation.
+func tightenSentence(s string) string {
+	words := strings.Fields(s)
+	if len(words) < 4 {
+		return s + " Nothing more was said."
+	}
+	words = append(words[:len(words)-2], words[len(words)-1])
+	return strings.Join(words, " ")
 }
 
 // editorReply merges the critics' notes found in the prompt: source ids are

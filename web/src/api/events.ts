@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Critique, Issue, RunStatus } from "./client";
+import type { Critique, DiffStats, Issue, RunStatus, SkippedIssue } from "./client";
 
 /** Payloads of the run events the server emits (see internal/runs and internal/guild). */
 export type FinishedPayload = {
@@ -46,11 +46,27 @@ export type EditorPayload = {
   usage?: WriterUsage;
 };
 
+export type RevisionPayload = {
+  writer_id: string;
+  slug: string;
+  scene: number;
+  scenes?: number;
+  notes?: number;
+  text?: string;
+  reason?: string;
+  revision_id?: string;
+  stats?: DiffStats;
+  skipped?: SkippedIssue[];
+  warnings?: string[];
+  usage?: WriterUsage;
+};
+
 export type RunEventMessage =
   | { type: "run.started"; seq: number; payload: { kind: string } }
   | { type: "critique.plan"; seq: number; payload: PlanPayload }
   | { type: "writer.started" | "writer.delta" | "writer.retry" | "writer.done" | "writer.failed"; seq: number; payload: WriterPayload }
   | { type: "editor.started" | "editor.delta" | "editor.retry" | "editor.done"; seq: number; payload: EditorPayload }
+  | { type: "revision.started" | "revision.delta" | "revision.retry" | "revision.done"; seq: number; payload: RevisionPayload }
   | { type: "run.finished"; seq: number; payload: FinishedPayload }
   | { type: "end"; seq: number; payload: Record<string, never> };
 
@@ -66,6 +82,10 @@ const EVENT_TYPES = [
   "editor.delta",
   "editor.retry",
   "editor.done",
+  "revision.started",
+  "revision.delta",
+  "revision.retry",
+  "revision.done",
   "run.finished",
   "end",
 ] as const;

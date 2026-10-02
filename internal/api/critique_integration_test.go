@@ -56,6 +56,38 @@ func editorJSON(prompt string) string {
 	return string(b)
 }
 
+// reviseText plays the lead writer: it tightens each accepted passage named
+// in the prompt the same way the fake gateway does.
+var passageLine = regexp.MustCompile(`passage: ("(?:[^"\\]|\\.)*")`)
+
+func reviseText(prompt string) string {
+	chapter := sceneText(llm.Request{Messages: []llm.Message{{Role: "user", Content: prompt}}})
+	for _, m := range passageLine.FindAllStringSubmatch(prompt, -1) {
+		q, err := strconv.Unquote(m[1])
+		if err != nil {
+			continue
+		}
+		words := strings.Fields(q)
+		if len(words) >= 4 {
+			words = append(words[:len(words)-2], words[len(words)-1])
+		}
+		chapter = strings.Replace(chapter, q, strings.Join(words, " "), 1)
+	}
+	return chapter
+}
+
+// createSystemWriter gives the account one of its system agents.
+func (e *env) createSystemWriter(name, slug, alias string) sqlcgen.Writer {
+	e.t.Helper()
+	w, err := e.q.CreateWriter(context.Background(), sqlcgen.CreateWriterParams{
+		UserID: e.user.ID, Name: name, Slug: slug, ModelAlias: alias, SystemPrompt: "You are " + name + ".", Roles: []string{}, Enabled: true, Temperature: 0.3, IsSystem: true,
+	})
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	return w
+}
+
 // createEditor gives the account its editor-in-chief system agent.
 func (e *env) createEditor(alias string) sqlcgen.Writer {
 	e.t.Helper()
@@ -188,6 +220,7 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	e.want(e.do("POST", "/api/projects/"+p.Id.String()+"/bible", BibleEntryInput{Section: "character", Title: "Mara", Fields: map[string]string{"role": "harbour master", "voice": "clipped"}}, nil), 201, "POST", "bible")
 
 	e.createEditor("writersguild-editor")
+	e.createSystemWriter("Lead writer", "lead-writer", "writersguild-lead")
 	var editorFails atomic.Bool
 	critic := []WriterRole{"critic"}
 	good := e.createWriter("Good", "writersguild-good", critic, true)
@@ -198,6 +231,12 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 
 	var flakyCalls atomic.Int32
 	e.mock.StreamFn = func(ctx context.Context, req llm.Request, onDelta func(string)) (*llm.Response, error) {
+		if req.Metadata.GenerationName == "lead-writer" {
+			if req.Model != "writersguild-lead" || req.JSONMode || !strings.Contains(req.Messages[1].Content, "# Accepted notes to apply") {
+				t.Errorf("lead writer request wrong: model %q json %v", req.Model, req.JSONMode)
+			}
+			return streamJSON(reviseText(req.Messages[1].Content), onDelta), nil
+		}
 		if req.Metadata.GenerationName == "editor-in-chief" {
 			if req.Model != "writersguild-editor" || !req.JSONMode || !strings.Contains(req.Messages[1].Content, "[writersguild-good/") && !strings.Contains(req.Messages[1].Content, "[good/") {
 				t.Errorf("editor request wrong: model %q json %v", req.Model, req.JSONMode)
@@ -310,6 +349,107 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	if issues[0].Decision != "accepted" || issues[1].Decision != "rejected" || issues[2].Decision != "pending" || issues[3].Decision != "pending" {
 		t.Fatalf("decisions not persisted: %s %s %s %s", issues[0].Decision, issues[1].Decision, issues[2].Decision, issues[3].Decision)
 	}
+
+	other := newEnv(t)
+
+	// Revision: the lead writer applies the one accepted issue (scene 1 only;
+	// scene 2 has no accepted issue and must come back untouched).
+	critiqueRun := run
+	var revRun Run
+	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/revisions", RevisionStartInput{RunId: critiqueRun.Id}, &revRun), 202, "POST", "revisions")
+	if revRun.Kind != "revision" || revRun.Status != "running" {
+		t.Fatalf("revision run %+v", revRun)
+	}
+	if err := e.engine.Wait(waitCtx, revRun.Id); err != nil {
+		t.Fatal(err)
+	}
+	e.want(e.do("GET", "/api/runs/"+revRun.Id.String(), nil, &revRun), 200, "GET", "revision run")
+	if revRun.Status != "succeeded" {
+		t.Fatalf("revision run %q: %s", revRun.Status, revRun.Error)
+	}
+	rres := *revRun.Result
+	if rres["hunks"] != float64(1) || rres["applied_notes"] != float64(1) {
+		t.Fatalf("revision result %v", rres)
+	}
+	revID := rres["revision_id"].(string)
+	var rev Revision
+	e.want(e.do("GET", "/api/revisions/"+revID, nil, &rev), 200, "GET", "revision")
+	if rev.Status != "proposed" || rev.Stale || rev.BaseHash != ch.ContentHash || len(rev.Hunks) != 1 || len(rev.IssueIds) != 1 || rev.IssueIds[0] != issues[0].Id || len(rev.Skipped) != 0 {
+		t.Fatalf("revision %+v", rev)
+	}
+	h := rev.Hunks[0]
+	if chapterMD[h.OldStart:h.OldEnd] != h.OldText || h.OldText != "town " || h.NewText != "" || len(h.Ops) != 1 || h.Ops[0].Kind != "delete" {
+		t.Fatalf("hunk %+v", h)
+	}
+	if strings.Contains(rev.RevisedMd, "number 0 while the town slept") || !strings.Contains(rev.RevisedMd, "number 0 while the slept.") || !strings.Contains(rev.RevisedMd, "number 1 while the town slept") {
+		t.Fatalf("revised text should drop one word of the accepted passage: %q", rev.RevisedMd[:120])
+	}
+	if rev.Stats.WordsRemoved != 1 || rev.Stats.Hunks != 1 {
+		t.Fatalf("stats %+v", rev.Stats)
+	}
+	if !strings.Contains(rev.RevisedMd, "second boat had still not returned on day 0") {
+		t.Fatal("scene 2 should be untouched in the revised text")
+	}
+	var revList []Revision
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/revisions?status=proposed", nil, &revList), 200, "GET", "revisions")
+	if len(revList) != 1 || revList[0].Id != rev.Id {
+		t.Fatalf("revision list %+v", revList)
+	}
+	revCounts := map[string]int{}
+	for _, ev := range e.streamEvents(revRun.Id) {
+		revCounts[ev.Type]++
+	}
+	if revCounts[guild.EventRevisionStarted] != 1 || revCounts[guild.EventRevisionDelta] < 1 || revCounts[guild.EventRevisionDone] != 1 {
+		t.Fatalf("revision events %v", revCounts)
+	}
+	// Validation of the start request.
+	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/revisions", RevisionStartInput{RunId: revRun.Id}, nil), 400, "POST", "revision of a revision run")
+	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/revisions", RevisionStartInput{RunId: uuid.New()}, nil), 404, "POST", "unknown run")
+
+	// Apply the hunk: snapshot before, chapter updated, revision applied.
+	var applied RevisionApplyResult
+	e.want(e.do("POST", "/api/revisions/"+revID+"/apply", RevisionApplyInput{HunkIndexes: ptr([]int{0})}, &applied), 200, "POST", "apply")
+	if applied.Revision.Status != "applied" || applied.Revision.AppliedHunks == nil || len(*applied.Revision.AppliedHunks) != 1 || applied.Chapter.ContentMd != rev.RevisedMd || applied.Chapter.ContentHash != applied.Revision.ResultHash {
+		t.Fatalf("applied %+v", applied.Revision)
+	}
+	var versions []ChapterVersionSummary
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/versions", nil, &versions), 200, "GET", "versions")
+	if len(versions) == 0 || versions[0].Kind != "pre_revision" || versions[0].ContentHash != ch.ContentHash {
+		t.Fatalf("expected a pre_revision snapshot first: %+v", versions)
+	}
+	e.want(e.do("POST", "/api/revisions/"+revID+"/apply", nil, nil), 409, "POST", "apply twice")
+	e.want(e.do("POST", "/api/revisions/"+revID+"/discard", nil, nil), 409, "POST", "discard applied")
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String(), nil, &ch), 200, "GET", "chapter")
+
+	// A second revision: accept the last issue too. The first issue's passage
+	// has changed, so it is skipped; the chapter then changes under the
+	// proposal, which makes it stale and unapplicable.
+	e.want(e.do("PUT", "/api/issues/"+issues[3].Id.String()+"/decision", IssueDecisionInput{Decision: "accepted"}, nil), 200, "PUT", "accept last")
+	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/revisions", RevisionStartInput{RunId: critiqueRun.Id}, &revRun), 202, "POST", "revisions 2")
+	_ = e.engine.Wait(waitCtx, revRun.Id)
+	e.want(e.do("GET", "/api/runs/"+revRun.Id.String(), nil, &revRun), 200, "GET", "revision run 2")
+	if revRun.Status != "succeeded" {
+		t.Fatalf("revision run 2 %q: %s", revRun.Status, revRun.Error)
+	}
+	rev2ID := (*revRun.Result)["revision_id"].(string)
+	e.want(e.do("GET", "/api/revisions/"+rev2ID, nil, &rev), 200, "GET", "revision 2")
+	if rev.Stale || len(rev.Skipped) != 1 || rev.Skipped[0].Key != "e1" || len(rev.IssueIds) != 1 || rev.IssueIds[0] != issues[3].Id || len(rev.Hunks) != 1 {
+		t.Fatalf("revision 2 %+v", rev)
+	}
+	e.want(e.do("PUT", "/api/chapters/"+ch.Id.String()+"/content", ChapterContentInput{ContentMd: ch.ContentMd + "\nA new last line.\n", BaseHash: ptr(ch.ContentHash)}, nil), 200, "PUT", "edit chapter")
+	e.want(e.do("GET", "/api/revisions/"+rev2ID, nil, &rev), 200, "GET", "revision 2 stale")
+	if !rev.Stale {
+		t.Fatal("revision should be stale after the chapter changed")
+	}
+	e.want(e.do("POST", "/api/revisions/"+rev2ID+"/apply", nil, nil), 409, "POST", "apply stale")
+	e.want(e.do("POST", "/api/revisions/"+rev2ID+"/discard", nil, &rev), 200, "POST", "discard")
+	if rev.Status != "discarded" || rev.Stale {
+		t.Fatalf("discarded %+v", rev)
+	}
+	e.want(e.do("POST", "/api/revisions/"+rev2ID+"/apply", nil, nil), 409, "POST", "apply discarded")
+	other.want(other.do("GET", "/api/revisions/"+rev2ID, nil, nil), 404, "GET", "other's revision")
+	other.want(other.do("POST", "/api/revisions/"+rev2ID+"/apply", nil, nil), 404, "POST", "other's apply")
+	other.want(other.do("POST", "/api/chapters/"+ch.Id.String()+"/revisions", RevisionStartInput{RunId: critiqueRun.Id}, nil), 404, "POST", "other's revision start")
 	if run.PromptTokens == 0 || run.CostUsd == 0 || !run.CostEstimated {
 		t.Fatalf("run usage not accumulated: %+v", run)
 	}
@@ -400,7 +540,6 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	var empty Chapter
 	e.want(e.do("POST", "/api/projects/"+p.Id.String()+"/chapters", ChapterCreateInput{Title: "Empty"}, &empty), 201, "POST", "chapter")
 	e.want(e.do("POST", "/api/chapters/"+empty.Id.String()+"/critiques", nil, nil), 400, "POST", "empty chapter")
-	other := newEnv(t)
 	other.want(other.do("POST", "/api/chapters/"+ch.Id.String()+"/critiques", nil, nil), 404, "POST", "other's chapter")
 	other.want(other.do("GET", "/api/runs/"+run.Id.String()+"/critiques", nil, nil), 404, "GET", "other's critiques")
 	other.want(other.do("GET", "/api/runs/"+run.Id.String()+"/issues", nil, nil), 404, "GET", "other's issues")
@@ -417,11 +556,18 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 		t.Fatalf("default selection convened %d critics, want 3", len(recs))
 	}
 	e.want(e.do("GET", "/api/runs/"+run.Id.String(), nil, &run), 200, "GET", "run")
-	if run.Status != "succeeded" || (*run.Result)["synthesis"] != "fallback" || (*run.Result)["issues"] != float64(8) {
-		t.Fatalf("fallback run %+v", run)
+	// The fallback lists every issue of every critic that succeeded, unmerged.
+	wantIssues := 0
+	for _, rec := range recs {
+		if rec.Critique != nil {
+			wantIssues += len(rec.Critique.Issues)
+		}
+	}
+	if run.Status != "succeeded" || (*run.Result)["synthesis"] != "fallback" || (*run.Result)["issues"] != float64(wantIssues) || wantIssues < 4 {
+		t.Fatalf("fallback run result %v", *run.Result)
 	}
 	e.want(e.do("GET", "/api/runs/"+run.Id.String()+"/issues", nil, &issues), 200, "GET", "issues")
-	if len(issues) != 8 || len(issues[0].Sources) != 1 || issues[0].Severity != "high" || issues[7].Severity != "medium" {
+	if len(issues) != wantIssues || len(issues[0].Sources) != 1 || issues[0].Severity != "high" || issues[len(issues)-1].Severity != "medium" {
 		t.Fatalf("fallback issues: %d, first %+v", len(issues), issues[0])
 	}
 	fallbackSeen := false

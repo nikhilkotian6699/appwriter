@@ -16,7 +16,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 1 | Projects, chapters, editor, story bible, writers, test writer, fake gateway | Done | `d9eb22a` |
 | 2 | Critique workflow: run engine, SSE, parallel critics, JSON validation, Langfuse metadata | Built on 5 feature branches, awaiting merge | see branches |
 | 3 | Editor-in-chief synthesis, issue list, accept/reject | Built on 2 feature branches, awaiting merge | see branches |
-| 4 | Revision with diff and hunks, bible-keeper proposals | In progress (word-diff pushed) | |
+| 4 | Revision with diff and hunks, bible-keeper proposals | In progress (word-diff, revision-workflow pushed; bible-keeper next) | |
 | 5 | Co-writing workflow and compare mode | Not started | |
 | 6 | Run history, cost and writer stats, settings page | Not started | |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Not started | |
@@ -42,7 +42,7 @@ branch is merged.
 | 3 | `feature/editor-in-chief` | critique-workflow | Pushed (awaiting merge) |
 | 3 | `feature/issue-decisions` | editor-in-chief | Pushed (awaiting merge) |
 | 4 | `feature/word-diff` | — | Pushed (awaiting merge) |
-| 4 | `feature/revision-workflow` | issue-decisions, word-diff | Not started |
+| 4 | `feature/revision-workflow` | issue-decisions, word-diff | Pushed (awaiting merge) |
 | 4 | `feature/bible-keeper` | revision-workflow | Not started |
 | 5 | `feature/cowrite` | run-engine | Not started |
 | 5 | `feature/compare-mode` | cowrite | Not started |
@@ -119,7 +119,18 @@ merged, origin did not show it yet when work started):
   byte offsets, word-level ops and context), `text.ApplyHunks` (apply any
   subset, rejects a changed base text), `text.Stats`; unit tests incl. round
   trips and a bounded large rewrite.
-- Next: `feature/revision-workflow`, then `feature/bible-keeper`.
+- `feature/revision-workflow` is done and pushed: migration 00005 `revisions`,
+  lead-writer run (per-scene, accepted issues re-anchored by quote, skipped
+  ones reported, reply validation with one retry, whitespace preserved),
+  word-level hunks stored; POST /api/chapters/{id}/revisions, GET
+  /api/revisions/{id}, GET /api/chapters/{id}/revisions, POST .../apply
+  (snapshot `pre_revision`, chosen hunks, 409 when stale or decided), POST
+  .../discard; Revise button, Lead writer section with streaming and the
+  side-by-side review dialog (accept all / selected / discard); fake-gateway
+  lead-writer reply; unit tests (validator, locating issues, prompts) and
+  integration coverage (two revisions, subset apply, snapshot, stale,
+  discard, isolation).
+- Next: `feature/bible-keeper`.
 
 ## Open items
 

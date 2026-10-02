@@ -116,6 +116,26 @@ type Project struct {
 	UpdatedAt   time.Time
 }
 
+type Revision struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	RunID         uuid.UUID
+	ChapterID     uuid.UUID
+	CritiqueRunID uuid.NullUUID
+	Status        string
+	BaseHash      string
+	BaseContentMd string
+	RevisedMd     string
+	Hunks         []byte
+	Stats         []byte
+	IssueIds      []byte
+	Skipped       []byte
+	AppliedHunks  []byte
+	ResultHash    string
+	CreatedAt     time.Time
+	DecidedAt     *time.Time
+}
+
 type Run struct {
 	ID               uuid.UUID
 	UserID           uuid.UUID

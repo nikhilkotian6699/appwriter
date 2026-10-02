@@ -3,11 +3,12 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Editor } from "@tiptap/react";
 import { api, ApiError, call, type Chapter } from "../api/client";
-import { keys, useChapter, useChapterRuns, useProject } from "../api/hooks";
+import { keys, useChapter, useChapterRevisions, useChapterRuns, useProject } from "../api/hooks";
 import { ChapterEditor } from "../components/editor/ChapterEditor";
 import { highlightQuote } from "../components/editor/issueHighlight";
 import { ConveneDialog } from "../components/guild/ConveneDialog";
 import { GuildPanel } from "../components/guild/GuildPanel";
+import { RevisionSection } from "../components/guild/RevisionSection";
 import { VersionsPanel } from "../components/VersionsPanel";
 import { Button, ErrorBanner, Spinner } from "../components/ui";
 import { wordCount } from "../lib/format";
@@ -32,6 +33,7 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
   const [panel, setPanel] = useState<Panel>("history");
   const [convening, setConvening] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [revisionRunId, setRevisionRunId] = useState<string | null>(null);
   const [currentHash, setCurrentHash] = useState(initial.content_hash);
   const [words, setWords] = useState(wordCount(initial.content_md));
   const [editorKey, setEditorKey] = useState(0);
@@ -171,6 +173,35 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
     },
   });
 
+  // A revision proposed earlier (and still applicable) can be reviewed without a new run.
+  const proposedRevisions = useChapterRevisions(chapterId, "proposed", 1);
+  const pendingRevision = !revisionRunId && proposedRevisions.data?.[0] && !proposedRevisions.data[0].stale ? proposedRevisions.data[0] : null;
+
+  const revise = useMutation({
+    mutationFn: async () => {
+      if (!activeRunId) throw new ApiError(0, "no_run", "Convene the Guild first.");
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      await save();
+      if (currentRef.current !== lastSavedRef.current) throw new ApiError(0, "unsaved", "The chapter could not be saved; fix that before asking for a revision.");
+      return call(api.POST("/api/chapters/{chapterId}/revisions", { params: { path: { chapterId } }, body: { run_id: activeRunId } }));
+    },
+    onSuccess: (run) => {
+      setRevisionRunId(run.id);
+      setPanel("guild");
+    },
+  });
+
+  const onRevisionApplied = useCallback(
+    (ch: Chapter) => {
+      applyServerContent(ch);
+      qc.invalidateQueries({ queryKey: keys.versions(chapterId) });
+      qc.invalidateQueries({ queryKey: keys.chapterRevisions(chapterId, "proposed") });
+    },
+    // applyServerContent is stable enough: it only touches refs and setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chapterId, qc],
+  );
+
   const onHighlight = useCallback((quote: string) => {
     const editor = editorRef.current;
     return editor ? highlightQuote(editor, quote) : false;
@@ -254,7 +285,19 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
         {panel === "guild" && activeRunId && (
           <aside aria-label="The Guild" className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
             <h2 className="mb-2 font-semibold text-stone-900">The Guild</h2>
-            <GuildPanel key={activeRunId} runId={activeRunId} currentHash={currentHash} onHighlight={onHighlight} onConveneAgain={() => setConvening(true)} />
+            <ErrorBanner error={revise.error} />
+            <div className="mb-3">
+              <RevisionSection key={revisionRunId ?? pendingRevision?.id ?? "none"} runId={revisionRunId} pending={pendingRevision} chapterId={chapterId} onApplied={onRevisionApplied} />
+            </div>
+            <GuildPanel
+              key={activeRunId}
+              runId={activeRunId}
+              currentHash={currentHash}
+              onHighlight={onHighlight}
+              onConveneAgain={() => setConvening(true)}
+              onRevise={() => revise.mutate()}
+              revising={revise.isPending}
+            />
           </aside>
         )}
       </div>
