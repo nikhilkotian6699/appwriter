@@ -152,6 +152,20 @@ that mentions none of the first account's identifiers); a new route without a
 probe fails the test, so no endpoint can ship without saying how it keeps
 accounts apart.
 
+## The guide
+
+The guide for first-time users lives in `guide/src`: numbered Markdown
+chapters, `marks.json` (the caption and lettered legend of every screenshot,
+with the marks' pixel positions) and `img/` (the screenshots). `make guide`
+(or `go run ./guide/build`) turns them into `guide/dist/index.html` plus the
+annotated images, served under `/guide/` without login and linked as "Guide"
+from the header and the login page, and into `guide/dist/writers-guild-guide.html`,
+one self-contained file with the images inlined, to pass on. The build refuses
+a page that would request another server, and a figure whose screenshot is
+missing renders as a labelled placeholder so the words still read. The Docker
+image builds the guide itself; locally run `make guide` once before
+`make dev-api` if you want `/guide/` to serve.
+
 ## Development
 
 ```bash
@@ -160,7 +174,8 @@ make generate          # OpenAPI -> Go server interface + TS client, sqlc querie
 make test              # unit tests and frontend type check
 make test-integration  # integration tests against TEST_DATABASE_URL
 make test-db           # create writersguild_test on the compose Postgres
-make build             # frontend build, then both binaries into bin/
+make guide             # build the user guide into guide/dist
+make build             # frontend build, guide, then both binaries into bin/
 make fake              # run the fake gateway locally on :4000
 make dev-api           # run the API locally (reads .env)
 make dev-web           # Vite dev server on :5173 with /api proxied to :8080

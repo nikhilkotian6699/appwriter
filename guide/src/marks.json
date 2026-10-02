@@ -1,0 +1,98 @@
+{
+  "login": {"title": "The sign-in page", "marks": [
+    {"letter": "A", "label": "Username"},
+    {"letter": "B", "label": "Password"},
+    {"letter": "C", "label": "Sign in"}
+  ]},
+  "projects": {"title": "The Projects page", "marks": [
+    {"letter": "A", "label": "Projects in the top bar"},
+    {"letter": "B", "label": "New project"}
+  ]},
+  "project": {"title": "A project page", "marks": [
+    {"letter": "A", "label": "The chapters, in the order of the book"},
+    {"letter": "B", "label": "New chapter"},
+    {"letter": "C", "label": "Story bible"}
+  ]},
+  "bible": {"title": "The story bible", "marks": [
+    {"letter": "A", "label": "The six sections"},
+    {"letter": "B", "label": "Add an entry to a section"},
+    {"letter": "C", "label": "Click an entry to edit or delete it"}
+  ]},
+  "chapter-editor": {"title": "The chapter editor", "marks": [
+    {"letter": "A", "label": "Where you write"},
+    {"letter": "B", "label": "Toolbar, with the scene break at the end"},
+    {"letter": "C", "label": "Word count and save status"},
+    {"letter": "D", "label": "Chapter title; click to rename"},
+    {"letter": "E", "label": "Versions"},
+    {"letter": "F", "label": "Convene the Guild"},
+    {"letter": "G", "label": "Co-write"},
+    {"letter": "H", "label": "History"},
+    {"letter": "I", "label": "Guild panel on and off"}
+  ]},
+  "writers": {"title": "The Writers page", "marks": [
+    {"letter": "A", "label": "Roles: critic, co-writer or both"},
+    {"letter": "B", "label": "Enabled or disabled"},
+    {"letter": "C", "label": "Add writer"},
+    {"letter": "D", "label": "Test writer"}
+  ]},
+  "convene-dialog": {"title": "Convene the Guild", "marks": [
+    {"letter": "A", "label": "Tick the critics to convene"},
+    {"letter": "B", "label": "Convene"}
+  ]},
+  "guild-panel": {"title": "The Guild panel while the critics read", "marks": [
+    {"letter": "A", "label": "One card per critic"},
+    {"letter": "B", "label": "Issues: severity, quote, problem, fix"},
+    {"letter": "C", "label": "Story bible conflicts"},
+    {"letter": "D", "label": "Cancel the session"},
+    {"letter": "E", "label": "Click a quote to highlight it in the chapter"}
+  ]},
+  "editor-list": {"title": "The editor-in-chief's list", "marks": [
+    {"letter": "A", "label": "One merged, prioritized issue"},
+    {"letter": "B", "label": "The passage; click to highlight"},
+    {"letter": "C", "label": "Raised by: the critics behind it"},
+    {"letter": "D", "label": "Accept, Edit fix, Reject; Undo afterwards"},
+    {"letter": "E", "label": "Decisions so far"},
+    {"letter": "F", "label": "Revise"}
+  ]},
+  "revision-dialog": {"title": "Reviewing a revision", "marks": [
+    {"letter": "A", "label": "Before and after, word by word"},
+    {"letter": "B", "label": "Tick box per change"},
+    {"letter": "C", "label": "Accept all or Accept selected"},
+    {"letter": "D", "label": "Discard"}
+  ]},
+  "bible-proposals": {"title": "Story bible proposals", "marks": [
+    {"letter": "A", "label": "Approve"},
+    {"letter": "B", "label": "Edit and approve"},
+    {"letter": "C", "label": "Reject"}
+  ]},
+  "cowrite-dialog": {"title": "Asking for a draft", "marks": [
+    {"letter": "A", "label": "Pick a writer, or two or three to compare"},
+    {"letter": "B", "label": "Instruction, with common requests underneath"},
+    {"letter": "C", "label": "Scene notes"},
+    {"letter": "D", "label": "Ask for a draft"}
+  ]},
+  "drafts": {"title": "A draft in the Guild panel", "marks": [
+    {"letter": "A", "label": "The draft, in the writer's voice"},
+    {"letter": "B", "label": "Insert at cursor"},
+    {"letter": "C", "label": "Replace selection"},
+    {"letter": "D", "label": "Discard; Take back afterwards"}
+  ]},
+  "history": {"title": "A chapter's history", "marks": [
+    {"letter": "A", "label": "Totals: runs, cost, tokens"},
+    {"letter": "B", "label": "Filter by kind"},
+    {"letter": "C", "label": "One run; click for its gateway calls"}
+  ]},
+  "stats": {"title": "Writer stats", "marks": [
+    {"letter": "A", "label": "Period and project"},
+    {"letter": "B", "label": "One writer: notes cited, accepted, rate, drafts, cost"}
+  ]},
+  "account": {"title": "The Account page", "marks": [
+    {"letter": "A", "label": "Display name"},
+    {"letter": "B", "label": "Change password"}
+  ]},
+  "users": {"title": "The Users page (admins)", "marks": [
+    {"letter": "A", "label": "Period for the usage numbers"},
+    {"letter": "B", "label": "Add an account"},
+    {"letter": "C", "label": "Edit, Password, Disable or Enable, Delete"}
+  ]}
+}

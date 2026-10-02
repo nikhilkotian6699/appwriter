@@ -3,7 +3,7 @@ export PATH := $(HOME)/.docker/bin:$(PATH)
 -include .env
 export
 
-.PHONY: help generate web-install web-build build test test-integration test-db docker-up docker-down fake dev-api dev-web
+.PHONY: help generate web-install web-build guide build test test-integration test-db docker-up docker-down fake dev-api dev-web
 
 help: ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -19,7 +19,10 @@ web-install: ## install frontend dependencies
 web-build: ## build the frontend into web/dist (embedded by the Go binary)
 	cd web && npm run build
 
-build: web-build ## build both binaries into bin/
+guide: ## build the user guide into guide/dist (served at /guide/, plus one single-file HTML)
+	go run ./guide/build
+
+build: web-build guide ## build both binaries into bin/
 	go build -o bin/writersguild ./cmd/writersguild
 	go build -o bin/fakegateway ./cmd/fakegateway
 

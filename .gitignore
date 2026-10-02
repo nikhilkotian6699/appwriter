@@ -7,6 +7,8 @@
 /bin/
 /web/dist/*
 !/web/dist/.keep
+/guide/dist/*
+!/guide/dist/.keep
 /web/node_modules/
 /guide/node_modules/
 

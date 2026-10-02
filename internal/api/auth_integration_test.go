@@ -108,6 +108,14 @@ func TestIntegrationLoginAndSessions(t *testing.T) {
 	if rec := e.do("GET", "/api/healthz", "", "", ""); rec.Code != 200 {
 		t.Fatalf("health should be public: %d", rec.Code)
 	}
+	// The guide and the app shell are served without login (the guide is
+	// built separately, so in a bare checkout it may be absent: never 401).
+	if rec := e.do("GET", "/guide/", "", "", ""); rec.Code == 401 {
+		t.Fatal("the guide must not require login")
+	}
+	if rec := e.do("GET", "/projects", "", "", ""); rec.Code != 200 {
+		t.Fatalf("the app shell should be public so the login page can load: %d", rec.Code)
+	}
 	if rec := e.do("GET", "/api/projects", "", "garbage.token.value", ""); rec.Code != 401 {
 		t.Fatalf("garbage cookie: %d", rec.Code)
 	}

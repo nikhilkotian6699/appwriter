@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M8 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-03 (M9 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -21,7 +21,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 6 | Run history, cost and writer stats, settings page | Built on 2 feature branches, awaiting merge | see branches |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Built on 4 feature branches, awaiting merge | see branches |
 | 8 | Account management: usage per user, roles, passwords, disable, delete | Built on 2 feature branches, awaiting merge | see branches |
-| 9 | In-app guide for new users | Next | |
+| 9 | In-app guide for new users | In progress (guide-content pushed; guide-screenshots next) | |
 
 ## Feature branches
 
@@ -33,7 +33,7 @@ branch is merged.
 | Milestone | Branch | Depends on | Status |
 |-----------|--------|------------|--------|
 | any | `feature/ci` | — | Not started |
-| any | `feature/guide-content` | — | Not started |
+| any | `feature/guide-content` | — | Pushed (awaiting merge) |
 | 2 | `feature/run-engine` | — | Pushed (awaiting merge) |
 | 2 | `feature/text-tooling` | — | Pushed (awaiting merge) |
 | 2 | `feature/structured-output` | text-tooling | Pushed (awaiting merge) |
@@ -240,8 +240,22 @@ the stack merged when work started):
   actions with dialogs; isolation probes and integration coverage.
 
 Milestone 8 is complete pending merge (order: account-usage,
-account-management) and the live gateway check. Next: Milestone 9 on
-`feature/guide-content` then `feature/guide-screenshots`.
+account-management) and the live gateway check. Milestone 9 (stacked on `feature/account-management`; origin still showed
+none of the stack merged when work started):
+
+- `feature/guide-content` is done and pushed: 18 Markdown chapters in
+  `guide/src` (welcome, signing in, first project, story bible, writing,
+  the writers and their cast, convening, the editor's list, revising, bible
+  keeper, co-writing and compare, history and stats, account, admins, a
+  sample chapter, where to click, troubleshooting, glossary), `marks.json`
+  with every figure's caption and lettered legend, and `guide/build` (Go):
+  Markdown to HTML with goldmark, figures with legends and amber lettered
+  marks drawn on the screenshots, table of contents, inline styles only, a
+  check that nothing is fetched from other servers, and a single-file copy
+  with images inlined. `make guide` / Docker build it; `guide/dist` is
+  ignored by git. Unit tests incl. an end-to-end build and anchor check.
+- Next: `feature/guide-screenshots` — capture every screen, add the pixel
+  positions of the marks, rebuild.
 
 ## Open items
 
