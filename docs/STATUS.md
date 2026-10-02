@@ -36,7 +36,7 @@ branch is merged.
 | any | `feature/guide-content` | — | Not started |
 | 2 | `feature/run-engine` | — | Pushed (awaiting merge) |
 | 2 | `feature/text-tooling` | — | Pushed (awaiting merge) |
-| 2 | `feature/structured-output` | text-tooling | Not started |
+| 2 | `feature/structured-output` | text-tooling | Pushed (awaiting merge) |
 | 2 | `feature/critique-workflow` | run-engine, structured-output | Not started |
 | 2 | `feature/critique-ui` | critique-workflow | Not started |
 | 3 | `feature/editor-in-chief` | critique-workflow | Not started |
@@ -71,7 +71,10 @@ messages `M2: <title> (n/5)`.
 - `feature/text-tooling` is done and pushed: token estimation, scene
   splitting at breaks/headings with paragraph fallback, quote anchoring that
   tolerates curly quotes, dashes, whitespace and Markdown markers.
-- Next: `feature/structured-output`.
+- `feature/structured-output` is done and pushed: critique JSON extraction,
+  validation against the chapter (severity, quotes anchored, ≤3 issues, ≤2
+  sentences, unique ids), ValidationError + RetryPrompt for the one retry.
+- Next: `feature/critique-workflow`.
 
 ## Open items
 
