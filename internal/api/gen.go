@@ -465,6 +465,14 @@ type Issue struct {
 // IssueDecision defines model for IssueDecision.
 type IssueDecision string
 
+// IssueDecisionInput defines model for IssueDecisionInput.
+type IssueDecisionInput struct {
+	Decision IssueDecision `json:"decision"`
+
+	// EditedFix The author's own wording of the fix. Omitted keeps the current value; null or empty clears it.
+	EditedFix *string `json:"edited_fix,omitempty"`
+}
+
 // IssueSeverity defines model for IssueSeverity.
 type IssueSeverity string
 
@@ -636,6 +644,9 @@ type ChapterId = openapi_types.UUID
 // EntryId defines model for entryId.
 type EntryId = openapi_types.UUID
 
+// IssueId defines model for issueId.
+type IssueId = openapi_types.UUID
+
 // ProjectId defines model for projectId.
 type ProjectId = openapi_types.UUID
 
@@ -676,6 +687,9 @@ type StartCritiqueJSONRequestBody = CritiqueStartInput
 
 // CreateChapterSnapshotJSONRequestBody defines body for CreateChapterSnapshot for application/json ContentType.
 type CreateChapterSnapshotJSONRequestBody = SnapshotInput
+
+// DecideIssueJSONRequestBody defines body for DecideIssue for application/json ContentType.
+type DecideIssueJSONRequestBody = IssueDecisionInput
 
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectInput
@@ -742,6 +756,9 @@ type ServerInterface interface {
 	// ListGatewayModels Aliases known to the gateway
 	// (GET /api/gateway/models)
 	ListGatewayModels(w http.ResponseWriter, r *http.Request)
+	// DecideIssue Accept, reject, edit the fix of, or undo a decision on an issue
+	// (PUT /api/issues/{issueId}/decision)
+	DecideIssue(w http.ResponseWriter, r *http.Request, issueId IssueId)
 	// GetMe Current account and app configuration
 	// (GET /api/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -889,6 +906,12 @@ func (_ Unimplemented) RestoreChapterVersion(w http.ResponseWriter, r *http.Requ
 // ListGatewayModels Aliases known to the gateway
 // (GET /api/gateway/models)
 func (_ Unimplemented) ListGatewayModels(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DecideIssue Accept, reject, edit the fix of, or undo a decision on an issue
+// (PUT /api/issues/{issueId}/decision)
+func (_ Unimplemented) DecideIssue(w http.ResponseWriter, r *http.Request, issueId IssueId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1391,6 +1414,32 @@ func (siw *ServerInterfaceWrapper) ListGatewayModels(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListGatewayModels(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DecideIssue operation middleware
+func (siw *ServerInterfaceWrapper) DecideIssue(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "issueId" -------------
+	var issueId IssueId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "issueId", chi.URLParam(r, "issueId"), &issueId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "issueId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DecideIssue(w, r, issueId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2137,6 +2186,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}/issues", wrapper.ListRunIssues)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/issues/{issueId}/decision", wrapper.DecideIssue)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}", wrapper.GetRun)

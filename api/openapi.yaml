@@ -403,6 +403,30 @@ paths:
                 items: { $ref: "#/components/schemas/Issue" }
         default: { $ref: "#/components/responses/Error" }
 
+  /api/issues/{issueId}/decision:
+    parameters:
+      - $ref: "#/components/parameters/issueId"
+    put:
+      operationId: decideIssue
+      summary: Accept, reject, edit the fix of, or undo a decision on an issue
+      description: |
+        `accepted` with `edited_fix` set is "edit the fix": the author's wording
+        replaces the suggested fix when the revision is applied. `pending`
+        undoes a decision; `edited_fix` is kept unless it is sent as null or
+        empty.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IssueDecisionInput" }
+      responses:
+        "200":
+          description: The issue after the decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Issue" }
+        default: { $ref: "#/components/responses/Error" }
+
   /api/runs/{runId}:
     parameters:
       - $ref: "#/components/parameters/runId"
@@ -574,6 +598,11 @@ components:
       schema: { type: string, format: uuid }
     runId:
       name: runId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    issueId:
+      name: issueId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1013,3 +1042,14 @@ components:
         decided_at: { type: string, format: date-time }
         content_hash: { type: string, description: Hash of the chapter text the critique read }
         created_at: { type: string, format: date-time }
+
+    IssueDecisionInput:
+      type: object
+      required: [decision]
+      properties:
+        decision: { $ref: "#/components/schemas/IssueDecision" }
+        edited_fix:
+          type: string
+          nullable: true
+          maxLength: 5000
+          description: The author's own wording of the fix. Omitted keeps the current value; null or empty clears it.

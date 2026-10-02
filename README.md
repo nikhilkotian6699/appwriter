@@ -167,6 +167,13 @@ run's result says `synthesis: fallback`. Events: `editor.started`,
 `editor.delta`, `editor.retry`, `editor.done`. The list is at
 `GET /api/runs/{id}/issues`.
 
+Each issue carries the author's decision: `PUT /api/issues/{id}/decision`
+with `accepted`, `rejected`, or `pending` to undo; `accepted` with
+`edited_fix` is "edit the fix", and the author's wording is what the revision
+(milestone 4) will apply. In the Guild panel every issue has Accept, Edit fix
+and Reject buttons, decided issues show Undo, and the header counts
+accepted, rejected and pending.
+
 In the app, "Convene the Guild" on a chapter saves pending edits, lets you
 pick the critics, and opens the Guild panel beside the editor: each critic
 streams into its own card, then shows its overall note, issues with severity,

@@ -12,3 +12,11 @@ SELECT * FROM issues WHERE id = $1 AND user_id = $2;
 
 -- name: DeleteRunIssues :exec
 DELETE FROM issues WHERE run_id = $1 AND user_id = $2;
+
+-- name: SetIssueDecision :one
+UPDATE issues
+SET decision = $3,
+    edited_fix = $4,
+    decided_at = CASE WHEN $3 = 'pending' THEN NULL ELSE now() END
+WHERE id = $1 AND user_id = $2
+RETURNING *;

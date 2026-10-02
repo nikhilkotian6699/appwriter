@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, call, type Critique, type CritiqueRecord, type IssueSource, type Run, type RunStatus } from "../../api/client";
+import { api, call, type Critique, type CritiqueRecord, type Issue, type IssueDecision, type IssueSource, type Run, type RunStatus } from "../../api/client";
 import { keys, useRun, useRunCritiques, useRunIssues } from "../../api/hooks";
 import { useRunEvents, type EditorPayload, type EventIssue, type FinishedPayload, type PlanPayload, type RunEventMessage, type WriterPayload, type WriterUsage } from "../../api/events";
-import { Badge, Button, ErrorBanner, Spinner } from "../ui";
+import { Badge, Button, ErrorBanner, Spinner, Textarea } from "../ui";
 import { fmtCost, fmtTokens, timeAgo } from "../../lib/format";
 
 type WriterStatus = "waiting" | "reading" | "retrying" | "done" | "failed" | "cancelled";
@@ -181,7 +181,15 @@ export function GuildPanel({ runId, currentHash, onHighlight, onConveneAgain }: 
     return { prompt, completion, cost, estimated };
   }, [writers, state.finished, run.data]);
 
-  const issues: EventIssue[] | undefined = state.editor.status === "done" ? state.editor.issues : storedIssues.data;
+  const issues: EventIssue[] | undefined = storedIssues.data ?? (state.editor.status === "done" ? state.editor.issues : undefined);
+
+  const decide = useMutation({
+    mutationFn: (v: { id: string; decision: IssueDecision; edited_fix?: string | null }) =>
+      call(api.PUT("/api/issues/{issueId}/decision", { params: { path: { issueId: v.id } }, body: { decision: v.decision, edited_fix: v.edited_fix } })),
+    onSuccess: (updated: Issue) => {
+      qc.setQueryData(keys.runIssues(runId), (old: Issue[] | undefined) => (old ? old.map((i) => (i.id === updated.id ? updated : i)) : old));
+    },
+  });
   const synthesis = (run.data?.result?.synthesis as string | undefined) ?? (state.editor.fallback ? "fallback" : undefined);
   const editorDone = state.editor.status === "done" || (!!run.data && run.data.status !== "running");
   const planHash = state.plan?.content_hash ?? (run.data?.params?.content_hash as string | undefined);
@@ -223,7 +231,18 @@ export function GuildPanel({ runId, currentHash, onHighlight, onConveneAgain }: 
       {records.isLoading && writers.length === 0 && <Spinner />}
       {writers.length === 0 && !records.isLoading && runStatus === "running" && <p className="text-sm text-stone-500">Convening…</p>}
       {(state.editor.status !== "idle" || (issues && issues.length > 0) || synthesis) && (
-        <EditorSection editor={state.editor} issues={issues} synthesis={synthesis} loading={storedIssues.isLoading} runError={run.data?.error} onHighlight={onHighlight} />
+        <EditorSection
+          editor={state.editor}
+          issues={issues}
+          synthesis={synthesis}
+          loading={storedIssues.isLoading}
+          runError={run.data?.error}
+          onHighlight={onHighlight}
+          canDecide={!!storedIssues.data && runStatus !== "running"}
+          deciding={decide.isPending ? (decide.variables?.id ?? null) : null}
+          decideError={decide.error}
+          onDecide={(id, decision, edited_fix) => decide.mutate({ id, decision, edited_fix })}
+        />
       )}
       {writers.length > 0 && (
         <details open={!editorDone} className="group">
@@ -378,22 +397,50 @@ const severityTone: Record<string, "red" | "amber" | "stone"> = { high: "red", m
 
 type IssueLike = { severity: string; quote: string; problem: string; suggested_fix: string };
 
-function IssueItem({ issue, sources, onClick, missing, children }: { issue: IssueLike; sources?: IssueSource[]; onClick: () => void; missing: boolean; children?: React.ReactNode }) {
+const decisionTone: Record<IssueDecision, "green" | "red" | "stone"> = { accepted: "green", rejected: "red", pending: "stone" };
+
+function IssueItem({
+  issue,
+  sources,
+  onClick,
+  missing,
+  decision,
+  editedFix,
+  children,
+}: {
+  issue: IssueLike;
+  sources?: IssueSource[];
+  onClick: () => void;
+  missing: boolean;
+  decision?: IssueDecision;
+  editedFix?: string | null;
+  children?: React.ReactNode;
+}) {
+  const frame = decision === "accepted" ? "border-green-300 bg-green-50/40" : decision === "rejected" ? "border-stone-200 bg-stone-50 opacity-70" : "border-stone-200";
   return (
-    <li className="rounded-md border border-stone-200 p-2">
+    <li className={`rounded-md border p-2 ${frame}`}>
       <div className="flex items-start gap-2">
         <Badge tone={severityTone[issue.severity] ?? "stone"}>{issue.severity}</Badge>
         <button type="button" onClick={onClick} className="flex-1 text-left font-serif italic leading-snug text-stone-800 hover:underline" title="Show this passage in the editor">
           “{issue.quote}”
         </button>
+        {decision && decision !== "pending" && <Badge tone={decisionTone[decision]}>{decision}</Badge>}
       </div>
       {missing && <p className="mt-1 text-xs text-amber-800">This passage is no longer in the chapter text.</p>}
       <p className="mt-1.5 text-stone-700">{issue.problem}</p>
-      {issue.suggested_fix && (
-        <p className="mt-1 text-stone-600">
-          <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">Fix </span>
-          {issue.suggested_fix}
+      {editedFix ? (
+        <p className="mt-1 text-stone-700">
+          <span className="text-xs font-semibold uppercase tracking-wide text-green-700">Your fix </span>
+          {editedFix}
+          {issue.suggested_fix && <span className="block text-xs text-stone-400 line-through">{issue.suggested_fix}</span>}
         </p>
+      ) : (
+        issue.suggested_fix && (
+          <p className="mt-1 text-stone-600">
+            <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">Fix </span>
+            {issue.suggested_fix}
+          </p>
+        )
       )}
       {sources && sources.length > 0 && (
         <p className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-stone-500">
@@ -417,6 +464,10 @@ function EditorSection({
   loading,
   runError,
   onHighlight,
+  canDecide,
+  deciding,
+  decideError,
+  onDecide,
 }: {
   editor: EditorState;
   issues?: EventIssue[];
@@ -424,8 +475,17 @@ function EditorSection({
   loading: boolean;
   runError?: string;
   onHighlight: (quote: string) => boolean;
+  canDecide: boolean;
+  deciding: string | null;
+  decideError: unknown;
+  onDecide: (id: string, decision: IssueDecision, edited_fix?: string | null) => void;
 }) {
   const [notFound, setNotFound] = useState<string | null>(null);
+  const counts = useMemo(() => {
+    const c = { accepted: 0, rejected: 0, pending: 0 };
+    for (const is of issues ?? []) c[is.decision] += 1;
+    return c;
+  }, [issues]);
   const streamRef = useRef<HTMLPreElement | null>(null);
   useEffect(() => {
     if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight;
@@ -461,10 +521,23 @@ function EditorSection({
         )}
         {loading && !issues && <Spinner />}
         {issues && issues.length === 0 && !live && <p className="text-xs text-stone-500">The editor-in-chief set every note aside: nothing here needs changing.</p>}
+        {issues && issues.length > 0 && canDecide && (
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500">
+            <span>
+              {counts.accepted} accepted · {counts.rejected} rejected · {counts.pending} pending
+            </span>
+            <Button size="sm" variant="primary" disabled title="Revise arrives in milestone 4: the lead writer applies the accepted issues">
+              Revise ({counts.accepted})
+            </Button>
+          </div>
+        )}
+        <ErrorBanner error={decideError} />
         {issues && issues.length > 0 && (
           <ol className="space-y-2">
             {issues.map((is) => (
-              <IssueItem key={is.id} issue={is} sources={is.sources} onClick={() => click(is.quote)} missing={notFound === is.quote} />
+              <IssueItem key={is.id} issue={is} sources={is.sources} onClick={() => click(is.quote)} missing={notFound === is.quote} decision={is.decision} editedFix={is.edited_fix ?? null}>
+                {canDecide && <DecisionControls issue={is} busy={deciding === is.id} onDecide={(d, fix) => onDecide(is.id, d, fix)} />}
+              </IssueItem>
             ))}
           </ol>
         )}
@@ -485,5 +558,65 @@ function EditorSection({
         )}
       </div>
     </section>
+  );
+}
+
+function DecisionControls({ issue, busy, onDecide }: { issue: EventIssue; busy: boolean; onDecide: (decision: IssueDecision, edited_fix?: string | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(issue.edited_fix ?? issue.suggested_fix);
+  useEffect(() => {
+    if (!editing) setDraft(issue.edited_fix ?? issue.suggested_fix);
+  }, [issue.edited_fix, issue.suggested_fix, editing]);
+
+  if (editing) {
+    return (
+      <div className="mt-2 space-y-2">
+        <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} maxLength={5000} aria-label="Your wording of the fix" autoFocus />
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="primary"
+            loading={busy}
+            disabled={draft.trim() === ""}
+            onClick={() => {
+              onDecide("accepted", draft.trim());
+              setEditing(false);
+            }}
+          >
+            Save and accept
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={busy}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  if (issue.decision === "pending") {
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <Button size="sm" variant="primary" loading={busy} onClick={() => onDecide("accepted")}>
+          Accept
+        </Button>
+        <Button size="sm" onClick={() => setEditing(true)} disabled={busy}>
+          Edit fix
+        </Button>
+        <Button size="sm" variant="danger" onClick={() => onDecide("rejected")} disabled={busy}>
+          Reject
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <Button size="sm" variant="ghost" loading={busy} onClick={() => onDecide("pending")} title="Take this decision back">
+        Undo
+      </Button>
+      {issue.decision === "accepted" && (
+        <Button size="sm" variant="ghost" onClick={() => setEditing(true)} disabled={busy}>
+          Edit fix
+        </Button>
+      )}
+    </div>
   );
 }

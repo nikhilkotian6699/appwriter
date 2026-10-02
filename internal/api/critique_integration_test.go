@@ -278,6 +278,38 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	if !strings.Contains(issues[0].Quote, "first boat") || !strings.Contains(issues[3].Quote, "second boat") {
 		t.Fatalf("issue order %q / %q", issues[0].Quote, issues[3].Quote)
 	}
+
+	// Decisions: accept, reject, edit the fix, undo.
+	var decided Issue
+	path := "/api/issues/" + issues[0].Id.String() + "/decision"
+	e.want(e.do("PUT", path, IssueDecisionInput{Decision: "accepted"}, &decided), 200, "PUT", "accept")
+	if decided.Decision != "accepted" || decided.DecidedAt == nil || decided.EditedFix != nil {
+		t.Fatalf("accepted %+v", decided)
+	}
+	e.want(e.do("PUT", "/api/issues/"+issues[1].Id.String()+"/decision", IssueDecisionInput{Decision: "rejected"}, &decided), 200, "PUT", "reject")
+	if decided.Decision != "rejected" || decided.DecidedAt == nil {
+		t.Fatalf("rejected %+v", decided)
+	}
+	e.want(e.do("PUT", "/api/issues/"+issues[2].Id.String()+"/decision", IssueDecisionInput{Decision: "accepted", EditedFix: ptr("  Cut the clause after the comma.  ")}, &decided), 200, "PUT", "edit")
+	if decided.Decision != "accepted" || decided.EditedFix == nil || *decided.EditedFix != "Cut the clause after the comma." {
+		t.Fatalf("edited %+v", decided)
+	}
+	// Undo keeps the author's wording unless it is cleared explicitly.
+	e.want(e.do("PUT", "/api/issues/"+issues[2].Id.String()+"/decision", IssueDecisionInput{Decision: "pending"}, &decided), 200, "PUT", "undo")
+	if decided.Decision != "pending" || decided.DecidedAt != nil || decided.EditedFix == nil {
+		t.Fatalf("undone %+v", decided)
+	}
+	e.want(e.do("PUT", "/api/issues/"+issues[2].Id.String()+"/decision", IssueDecisionInput{Decision: "pending", EditedFix: ptr("")}, &decided), 200, "PUT", "clear")
+	if decided.EditedFix != nil {
+		t.Fatalf("edited fix should be cleared: %+v", decided)
+	}
+	e.want(e.do("PUT", path, map[string]string{"decision": "maybe"}, nil), 400, "PUT", "bad decision")
+	e.want(e.do("PUT", path, IssueDecisionInput{Decision: "accepted", EditedFix: ptr(strings.Repeat("x", 5001))}, nil), 400, "PUT", "too long")
+	e.want(e.do("PUT", "/api/issues/"+uuid.New().String()+"/decision", IssueDecisionInput{Decision: "accepted"}, nil), 404, "PUT", "unknown issue")
+	e.want(e.do("GET", "/api/runs/"+run.Id.String()+"/issues", nil, &issues), 200, "GET", "issues")
+	if issues[0].Decision != "accepted" || issues[1].Decision != "rejected" || issues[2].Decision != "pending" || issues[3].Decision != "pending" {
+		t.Fatalf("decisions not persisted: %s %s %s %s", issues[0].Decision, issues[1].Decision, issues[2].Decision, issues[3].Decision)
+	}
 	if run.PromptTokens == 0 || run.CostUsd == 0 || !run.CostEstimated {
 		t.Fatalf("run usage not accumulated: %+v", run)
 	}
@@ -372,6 +404,7 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	other.want(other.do("POST", "/api/chapters/"+ch.Id.String()+"/critiques", nil, nil), 404, "POST", "other's chapter")
 	other.want(other.do("GET", "/api/runs/"+run.Id.String()+"/critiques", nil, nil), 404, "GET", "other's critiques")
 	other.want(other.do("GET", "/api/runs/"+run.Id.String()+"/issues", nil, nil), 404, "GET", "other's issues")
+	other.want(other.do("PUT", "/api/issues/"+issues[0].Id.String()+"/decision", IssueDecisionInput{Decision: "rejected"}, nil), 404, "PUT", "other's decision")
 
 	// Default selection: every enabled critic (good, flaky, failing; not the
 	// disabled one or the co-writer). This time the editor-in-chief fails, so

@@ -327,6 +327,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/issues/{issueId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issueId: components["parameters"]["issueId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Accept, reject, edit the fix of, or undo a decision on an issue
+         * @description `accepted` with `edited_fix` set is "edit the fix": the author's wording
+         *     replaces the suggested fix when the revision is applied. `pending`
+         *     undoes a decision; `edited_fix` is kept unless it is sent as null or
+         *     empty.
+         */
+        put: operations["decideIssue"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{runId}": {
         parameters: {
             query?: never;
@@ -823,6 +848,11 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        IssueDecisionInput: {
+            decision: components["schemas"]["IssueDecision"];
+            /** @description The author's own wording of the fix. Omitted keeps the current value; null or empty clears it. */
+            edited_fix?: string | null;
+        };
     };
     responses: {
         /** @description Error */
@@ -842,6 +872,7 @@ export interface components {
         entryId: string;
         writerId: string;
         runId: string;
+        issueId: string;
     };
     requestBodies: never;
     headers: never;
@@ -1501,6 +1532,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Issue"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    decideIssue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                issueId: components["parameters"]["issueId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description The issue after the decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Issue"];
                 };
             };
             default: components["responses"]["Error"];

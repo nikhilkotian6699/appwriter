@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"writersguild/internal/db/sqlcgen"
 	"writersguild/internal/guild"
@@ -40,4 +41,47 @@ func toIssue(r sqlcgen.Issue) Issue {
 		out.Sources = append(out.Sources, IssueSource{Id: src.ID, CritiqueId: src.CritiqueID, WriterId: src.WriterID, WriterName: src.WriterName, WriterSlug: src.WriterSlug, IssueId: src.IssueID})
 	}
 	return out
+}
+
+var issueDecisions = map[string]bool{"pending": true, "accepted": true, "rejected": true}
+
+// DecideIssue records the author's decision on one issue of the
+// editor-in-chief's list: accept, reject, accept with an edited fix, or
+// pending to undo.
+func (s *Server) DecideIssue(w http.ResponseWriter, r *http.Request, issueId IssueId) {
+	u := currentUser(r.Context())
+	var in IssueDecisionInput
+	if err := decodeJSON(r, &in); err != nil {
+		s.fail(w, err)
+		return
+	}
+	decision := string(in.Decision)
+	if !issueDecisions[decision] {
+		s.fail(w, errBadRequest("decision must be pending, accepted or rejected"))
+		return
+	}
+	cur, err := s.q.GetIssue(r.Context(), sqlcgen.GetIssueParams{ID: issueId, UserID: u.ID})
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	edited := cur.EditedFix
+	if in.EditedFix != nil {
+		t := strings.TrimSpace(*in.EditedFix)
+		if len(t) > 5000 {
+			s.fail(w, errBadRequest("edited_fix must be at most 5000 characters"))
+			return
+		}
+		if t == "" {
+			edited = nil
+		} else {
+			edited = &t
+		}
+	}
+	row, err := s.q.SetIssueDecision(r.Context(), sqlcgen.SetIssueDecisionParams{ID: issueId, UserID: u.ID, Decision: decision, EditedFix: edited})
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toIssue(row))
 }

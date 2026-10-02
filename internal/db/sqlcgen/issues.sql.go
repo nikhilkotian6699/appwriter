@@ -175,3 +175,51 @@ func (q *Queries) ListRunIssues(ctx context.Context, arg ListRunIssuesParams) ([
 	}
 	return items, nil
 }
+
+const setIssueDecision = `-- name: SetIssueDecision :one
+UPDATE issues
+SET decision = $3,
+    edited_fix = $4,
+    decided_at = CASE WHEN $3 = 'pending' THEN NULL ELSE now() END
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, run_id, chapter_id, position, key, severity, quote, problem, suggested_fix, quote_start, quote_end, quote_exact, sources, decision, edited_fix, decided_at, content_hash, created_at
+`
+
+type SetIssueDecisionParams struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Decision  string
+	EditedFix *string
+}
+
+func (q *Queries) SetIssueDecision(ctx context.Context, arg SetIssueDecisionParams) (Issue, error) {
+	row := q.db.QueryRow(ctx, setIssueDecision,
+		arg.ID,
+		arg.UserID,
+		arg.Decision,
+		arg.EditedFix,
+	)
+	var i Issue
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.RunID,
+		&i.ChapterID,
+		&i.Position,
+		&i.Key,
+		&i.Severity,
+		&i.Quote,
+		&i.Problem,
+		&i.SuggestedFix,
+		&i.QuoteStart,
+		&i.QuoteEnd,
+		&i.QuoteExact,
+		&i.Sources,
+		&i.Decision,
+		&i.EditedFix,
+		&i.DecidedAt,
+		&i.ContentHash,
+		&i.CreatedAt,
+	)
+	return i, err
+}

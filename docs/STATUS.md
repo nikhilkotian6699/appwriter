@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-02 (M3 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-02 (M3 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -15,8 +15,8 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 |---|-------|--------|--------|
 | 1 | Projects, chapters, editor, story bible, writers, test writer, fake gateway | Done | `d9eb22a` |
 | 2 | Critique workflow: run engine, SSE, parallel critics, JSON validation, Langfuse metadata | Built on 5 feature branches, awaiting merge | see branches |
-| 3 | Editor-in-chief synthesis, issue list, accept/reject | In progress (editor-in-chief pushed; issue-decisions next) | |
-| 4 | Revision with diff and hunks, bible-keeper proposals | Not started | |
+| 3 | Editor-in-chief synthesis, issue list, accept/reject | Built on 2 feature branches, awaiting merge | see branches |
+| 4 | Revision with diff and hunks, bible-keeper proposals | Next | |
 | 5 | Co-writing workflow and compare mode | Not started | |
 | 6 | Run history, cost and writer stats, settings page | Not started | |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Not started | |
@@ -40,7 +40,7 @@ branch is merged.
 | 2 | `feature/critique-workflow` | run-engine, structured-output | Pushed (awaiting merge) |
 | 2 | `feature/critique-ui` | critique-workflow | Pushed (awaiting merge) |
 | 3 | `feature/editor-in-chief` | critique-workflow | Pushed (awaiting merge) |
-| 3 | `feature/issue-decisions` | editor-in-chief | Not started |
+| 3 | `feature/issue-decisions` | editor-in-chief | Pushed (awaiting merge) |
 | 4 | `feature/word-diff` | — | Not started |
 | 4 | `feature/revision-workflow` | issue-decisions, word-diff | Not started |
 | 4 | `feature/bible-keeper` | revision-workflow | Not started |
@@ -102,8 +102,15 @@ visible on origin when work started; rebase onto `develop` with
   section at the top of the Guild panel with source chips, fake-gateway editor
   reply, unit tests (input assembly, output validation, fallback) and
   integration coverage (merged sources, fallback).
-- Next: `feature/issue-decisions` — accept / reject / edit the fix / undo per
-  issue, `PUT /api/issues/{id}/decision`.
+- `feature/issue-decisions` is done and pushed: `PUT /api/issues/{id}/decision`
+  (accepted / rejected / pending=undo, optional edited_fix kept across undo,
+  cleared with null or empty), Accept / Edit fix / Reject / Undo controls per
+  issue in the Guild panel with decision counts and a disabled "Revise"
+  button for milestone 4, integration coverage incl. isolation.
+
+Milestone 3 is complete pending merge (order: editor-in-chief, then
+issue-decisions) and the live gateway check. Next: Milestone 4 on
+`feature/word-diff` (standalone) and `feature/revision-workflow`.
 
 ## Open items
 
