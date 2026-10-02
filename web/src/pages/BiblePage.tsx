@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, call, type BibleEntry, type BibleSection } from "../api/client";
-import { keys, useBible, useChapters, useProject } from "../api/hooks";
+import { keys, useBible, useChapters, useProject, useProjectBibleProposals } from "../api/hooks";
+import { BibleProposalsList } from "../components/guild/BibleProposals";
 import { Button, ConfirmDialog, Dialog, ErrorBanner, Field, Input, PageHeader, Select, Spinner, Textarea } from "../components/ui";
 
 type FieldSpec = { key: string; label: string; multiline?: boolean; help?: string };
@@ -32,6 +33,7 @@ type Draft = { section: BibleSection; title: string; fields: Record<string, stri
 
 export default function BiblePage() {
   const { projectId = "" } = useParams();
+  const pendingProposals = useProjectBibleProposals(projectId, "pending");
   const qc = useQueryClient();
   const project = useProject(projectId);
   const bible = useBible(projectId);
@@ -87,6 +89,15 @@ export default function BiblePage() {
         / Story bible
       </div>
       <PageHeader title="Story bible" subtitle="Every writer reads the relevant parts of this before critiquing or drafting. Keep it true." />
+      {pendingProposals.data && pendingProposals.data.length > 0 && (
+        <section className="mb-6 rounded-lg border border-amber-300 bg-amber-50/40 p-4" aria-label="Pending story bible proposals">
+          <h2 className="font-semibold text-stone-900">
+            {pendingProposals.data.length} proposal{pendingProposals.data.length === 1 ? "" : "s"} from the bible keeper
+          </h2>
+          <p className="mt-1 text-xs text-stone-600">After a revision, the bible keeper suggests what the chapter changed. Nothing is saved until you approve it.</p>
+          <BibleProposalsList proposals={pendingProposals.data} projectId={projectId} />
+        </section>
+      )}
       <ErrorBanner error={bible.error} onRetry={() => bible.refetch()} />
       {bible.isLoading && <Spinner />}
 

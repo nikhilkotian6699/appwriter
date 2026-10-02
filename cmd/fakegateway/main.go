@@ -210,6 +210,11 @@ func (g *gateway) reply(req chatRequest) string {
 	switch {
 	case gen == "lead-writer":
 		return leadWriterReply(req.Messages)
+	case gen == "bible-keeper":
+		if strings.Contains(req.Model, "invalid") {
+			return "The keeper has nothing to say in JSON."
+		}
+		return bibleKeeperReply(req.Messages)
 	case gen == "editor-in-chief":
 		if strings.Contains(req.Model, "invalid") {
 			return "The editor declines to answer in JSON today."
@@ -299,6 +304,38 @@ func critiqueReply(name string, msgs []message) string {
 		out["bible_conflicts"] = []conflict{{Quote: sentences[3], ConflictsWith: "the story bible's note on this character (canned conflict from the fake gateway)"}}
 	}
 	b, _ := json.MarshalIndent(out, "", "  ")
+	return string(b)
+}
+
+// bibleKeeperReply proposes one update of the first bible entry it finds
+// in the prompt (by id) and one new character, with canned rationales.
+func bibleKeeperReply(msgs []message) string {
+	var prompt string
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == "user" {
+			prompt = msgs[i].Content
+			break
+		}
+	}
+	type proposal struct {
+		Action    string            `json:"action"`
+		EntryID   string            `json:"entry_id,omitempty"`
+		Section   string            `json:"section"`
+		Title     string            `json:"title"`
+		Fields    map[string]string `json:"fields"`
+		Rationale string            `json:"rationale"`
+	}
+	proposals := []proposal{}
+	re := regexp.MustCompile(`- \[([0-9a-f-]{36})\](?: \*\*([^*]+)\*\*)?`)
+	if m := re.FindStringSubmatch(prompt); m != nil {
+		proposals = append(proposals, proposal{Action: "update", EntryID: m[1], Title: m[2],
+			Fields:    map[string]string{"key_facts": "Present in the revised chapter; see the latest scene (canned update from the fake gateway)."},
+			Rationale: "The revised chapter adds to what the bible records about this entry."})
+	}
+	proposals = append(proposals, proposal{Action: "add", Section: "character", Title: "The porter",
+		Fields:    map[string]string{"role": "porter at the gate", "key_facts": "gone by morning; nobody asked where"},
+		Rationale: "The chapter says the porter was gone by morning and nobody asked where."})
+	b, _ := json.MarshalIndent(map[string]any{"proposals": proposals}, "", "  ")
 	return string(b)
 }
 

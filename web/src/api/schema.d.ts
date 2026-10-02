@@ -444,6 +444,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chapters/{chapterId}/bible-updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the bible keeper what the chapter changes in the story bible
+         * @description Starts a bible update run in the background and returns it at once.
+         *     It also starts by itself when a revision is applied. Events:
+         *     `bible.started`, `bible.delta`, `bible.retry`, `bible.done` (with the
+         *     stored proposals), then `run.finished`. Proposals wait for the
+         *     author's decision at `GET /api/projects/{projectId}/bible/proposals`.
+         */
+        post: operations["startBibleUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{projectId}/bible/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["projectId"];
+            };
+            cookie?: never;
+        };
+        /** Story bible proposals of a project, newest first */
+        get: operations["listProjectBibleProposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/bible-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        /** The proposals a bible update run produced */
+        get: operations["listRunBibleProposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bible-proposals/{proposalId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposalId: components["parameters"]["proposalId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Approve (optionally edited) or reject a story bible proposal
+         * @description `approved` applies the proposal to the story bible: an addition
+         *     creates the entry, an update rewrites the entry's title and fields,
+         *     a deletion removes it. `title` and `fields` in the body replace the
+         *     proposal's own before it is applied ("edit and approve"). A proposal
+         *     can be decided once; an update or deletion whose entry no longer
+         *     exists fails with 409.
+         */
+        put: operations["decideBibleProposal"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{runId}": {
         parameters: {
             query?: never;
@@ -1015,6 +1106,64 @@ export interface components {
         RevisionApplyResult: {
             chapter: components["schemas"]["Chapter"];
             revision: components["schemas"]["Revision"];
+            /**
+             * Format: uuid
+             * @description The bible update run started by the apply
+             */
+            bible_run_id?: string;
+        };
+        /** @enum {string} */
+        ProposalAction: "add" | "update" | "delete";
+        /** @enum {string} */
+        ProposalStatus: "pending" | "approved" | "rejected";
+        /** @description A change to the story bible proposed by the bible keeper, waiting for or carrying the author's decision. */
+        BibleProposal: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            run_id: string;
+            /** Format: uuid */
+            project_id: string;
+            /** Format: uuid */
+            chapter_id?: string;
+            /** Format: uuid */
+            revision_id?: string;
+            action: components["schemas"]["ProposalAction"];
+            /**
+             * Format: uuid
+             * @description The entry to update or delete
+             */
+            entry_id?: string;
+            current?: components["schemas"]["BibleEntry"];
+            section: components["schemas"]["BibleSection"];
+            title: string;
+            fields: {
+                [key: string]: string;
+            };
+            rationale: string;
+            status: components["schemas"]["ProposalStatus"];
+            /** Format: uuid */
+            applied_entry_id?: string;
+            position: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            decided_at?: string;
+        };
+        BibleProposalDecisionInput: {
+            /** @enum {string} */
+            decision: "approved" | "rejected";
+            title?: string;
+            fields?: {
+                [key: string]: string;
+            };
+        };
+        BibleUpdateStartInput: {
+            /**
+             * Format: uuid
+             * @description The applied revision whose changes the keeper should consider
+             */
+            revision_id?: string;
         };
     };
     responses: {
@@ -1037,6 +1186,7 @@ export interface components {
         runId: string;
         issueId: string;
         revisionId: string;
+        proposalId: string;
     };
     requestBodies: never;
     headers: never;
@@ -1849,6 +1999,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Revision"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    startBibleUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["BibleUpdateStartInput"];
+            };
+        };
+        responses: {
+            /** @description The run that was started */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listProjectBibleProposals: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ProposalStatus"];
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                projectId: components["parameters"]["projectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BibleProposal"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRunBibleProposals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BibleProposal"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    decideBibleProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposalId: components["parameters"]["proposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BibleProposalDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description The proposal after the decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BibleProposal"];
                 };
             };
             default: components["responses"]["Error"];

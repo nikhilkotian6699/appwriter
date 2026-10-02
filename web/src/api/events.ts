@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Critique, DiffStats, Issue, RunStatus, SkippedIssue } from "./client";
+import type { BibleProposal, Critique, DiffStats, Issue, RunStatus, SkippedIssue } from "./client";
 
 /** Payloads of the run events the server emits (see internal/runs and internal/guild). */
 export type FinishedPayload = {
@@ -61,12 +61,23 @@ export type RevisionPayload = {
   usage?: WriterUsage;
 };
 
+export type BiblePayload = {
+  writer_id: string;
+  slug: string;
+  text?: string;
+  reason?: string;
+  proposals?: Omit<BibleProposal, "created_at" | "current">[];
+  warnings?: string[];
+  usage?: WriterUsage;
+};
+
 export type RunEventMessage =
   | { type: "run.started"; seq: number; payload: { kind: string } }
   | { type: "critique.plan"; seq: number; payload: PlanPayload }
   | { type: "writer.started" | "writer.delta" | "writer.retry" | "writer.done" | "writer.failed"; seq: number; payload: WriterPayload }
   | { type: "editor.started" | "editor.delta" | "editor.retry" | "editor.done"; seq: number; payload: EditorPayload }
   | { type: "revision.started" | "revision.delta" | "revision.retry" | "revision.done"; seq: number; payload: RevisionPayload }
+  | { type: "bible.started" | "bible.delta" | "bible.retry" | "bible.done"; seq: number; payload: BiblePayload }
   | { type: "run.finished"; seq: number; payload: FinishedPayload }
   | { type: "end"; seq: number; payload: Record<string, never> };
 
@@ -86,6 +97,10 @@ const EVENT_TYPES = [
   "revision.delta",
   "revision.retry",
   "revision.done",
+  "bible.started",
+  "bible.delta",
+  "bible.retry",
+  "bible.done",
   "run.finished",
   "end",
 ] as const;

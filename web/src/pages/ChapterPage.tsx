@@ -9,6 +9,7 @@ import { highlightQuote } from "../components/editor/issueHighlight";
 import { ConveneDialog } from "../components/guild/ConveneDialog";
 import { GuildPanel } from "../components/guild/GuildPanel";
 import { RevisionSection } from "../components/guild/RevisionSection";
+import { BibleKeeperSection } from "../components/guild/BibleKeeperSection";
 import { VersionsPanel } from "../components/VersionsPanel";
 import { Button, ErrorBanner, Spinner } from "../components/ui";
 import { wordCount } from "../lib/format";
@@ -34,6 +35,7 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
   const [convening, setConvening] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [revisionRunId, setRevisionRunId] = useState<string | null>(null);
+  const [bibleRunId, setBibleRunId] = useState<string | null>(null);
   const [currentHash, setCurrentHash] = useState(initial.content_hash);
   const [words, setWords] = useState(wordCount(initial.content_md));
   const [editorKey, setEditorKey] = useState(0);
@@ -191,11 +193,19 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
     },
   });
 
+  // The latest bible update of this chapter, so its proposals stay in view across reloads.
+  const bibleRuns = useChapterRuns(chapterId, "bible_update", 1);
+  useEffect(() => {
+    const latest = bibleRuns.data?.[0];
+    if (latest && !bibleRunId) setBibleRunId(latest.id);
+  }, [bibleRuns.data, bibleRunId]);
+
   const onRevisionApplied = useCallback(
-    (ch: Chapter) => {
+    (ch: Chapter, newBibleRunId: string | null) => {
       applyServerContent(ch);
       qc.invalidateQueries({ queryKey: keys.versions(chapterId) });
       qc.invalidateQueries({ queryKey: keys.chapterRevisions(chapterId, "proposed") });
+      if (newBibleRunId) setBibleRunId(newBibleRunId);
     },
     // applyServerContent is stable enough: it only touches refs and setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -286,7 +296,8 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
           <aside aria-label="The Guild" className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
             <h2 className="mb-2 font-semibold text-stone-900">The Guild</h2>
             <ErrorBanner error={revise.error} />
-            <div className="mb-3">
+            <div className="mb-3 space-y-3">
+              {bibleRunId && <BibleKeeperSection key={bibleRunId} runId={bibleRunId} projectId={initial.project_id} />}
               <RevisionSection key={revisionRunId ?? pendingRevision?.id ?? "none"} runId={revisionRunId} pending={pendingRevision} chapterId={chapterId} onApplied={onRevisionApplied} />
             </div>
             <GuildPanel

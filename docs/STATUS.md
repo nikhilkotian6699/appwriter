@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-02 (M3 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-02 (M4 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -16,8 +16,8 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 1 | Projects, chapters, editor, story bible, writers, test writer, fake gateway | Done | `d9eb22a` |
 | 2 | Critique workflow: run engine, SSE, parallel critics, JSON validation, Langfuse metadata | Built on 5 feature branches, awaiting merge | see branches |
 | 3 | Editor-in-chief synthesis, issue list, accept/reject | Built on 2 feature branches, awaiting merge | see branches |
-| 4 | Revision with diff and hunks, bible-keeper proposals | In progress (word-diff, revision-workflow pushed; bible-keeper next) | |
-| 5 | Co-writing workflow and compare mode | Not started | |
+| 4 | Revision with diff and hunks, bible-keeper proposals | Built on 3 feature branches, awaiting merge | see branches |
+| 5 | Co-writing workflow and compare mode | Next | |
 | 6 | Run history, cost and writer stats, settings page | Not started | |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Not started | |
 | 8 | Account management: usage per user, roles, passwords, disable, delete | Not started | |
@@ -43,7 +43,7 @@ branch is merged.
 | 3 | `feature/issue-decisions` | editor-in-chief | Pushed (awaiting merge) |
 | 4 | `feature/word-diff` | — | Pushed (awaiting merge) |
 | 4 | `feature/revision-workflow` | issue-decisions, word-diff | Pushed (awaiting merge) |
-| 4 | `feature/bible-keeper` | revision-workflow | Not started |
+| 4 | `feature/bible-keeper` | revision-workflow | Pushed (awaiting merge) |
 | 5 | `feature/cowrite` | run-engine | Not started |
 | 5 | `feature/compare-mode` | cowrite | Not started |
 | 6 | `feature/run-history` | — | Not started |
@@ -130,7 +130,19 @@ merged, origin did not show it yet when work started):
   lead-writer reply; unit tests (validator, locating issues, prompts) and
   integration coverage (two revisions, subset apply, snapshot, stale,
   discard, isolation).
-- Next: `feature/bible-keeper`.
+- `feature/bible-keeper` is done and pushed: migration 00006
+  `bible_proposals`, bible keeper run after an applied revision (bible with
+  entry ids, revised chapter, applied changes; validation with one retry;
+  updates merged over the entry), POST /api/chapters/{id}/bible-updates, GET
+  /api/projects/{id}/bible/proposals, GET /api/runs/{id}/bible-proposals, PUT
+  /api/bible-proposals/{id} (approve, edit and approve, reject; applies to the
+  bible in one transaction), Bible keeper section in the Guild panel and the
+  pending list at the top of the bible page, fake-gateway keeper reply, unit
+  and integration coverage.
+
+Milestone 4 is complete pending merge (order: word-diff, revision-workflow,
+bible-keeper) and the live gateway check. Next: Milestone 5 on
+`feature/cowrite` then `feature/compare-mode`.
 
 ## Open items
 

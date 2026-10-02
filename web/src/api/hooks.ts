@@ -16,6 +16,8 @@ export const keys = {
   runCritiques: (id: string) => ["runs", id, "critiques"] as const,
   runIssues: (id: string) => ["runs", id, "issues"] as const,
   revision: (id: string) => ["revisions", id] as const,
+  projectProposals: (projectId: string, status?: string) => ["projects", projectId, "proposals", status ?? "all"] as const,
+  runProposals: (runId: string) => ["runs", runId, "proposals"] as const,
   chapterRevisions: (chapterId: string, status?: string) => ["chapters", chapterId, "revisions", status ?? "all"] as const,
   chapterRuns: (chapterId: string, kind?: string) => ["chapters", chapterId, "runs", kind ?? "all"] as const,
 };
@@ -124,5 +126,20 @@ export function useChapterRevisions(chapterId: string, status?: "proposed" | "ap
   return useQuery({
     queryKey: keys.chapterRevisions(chapterId, status),
     queryFn: () => call(api.GET("/api/chapters/{chapterId}/revisions", { params: { path: { chapterId }, query: { status, limit } } })),
+  });
+}
+
+export function useProjectBibleProposals(projectId: string, status?: "pending" | "approved" | "rejected", limit = 50) {
+  return useQuery({
+    queryKey: keys.projectProposals(projectId, status),
+    queryFn: () => call(api.GET("/api/projects/{projectId}/bible/proposals", { params: { path: { projectId }, query: { status, limit } } })),
+  });
+}
+
+export function useRunBibleProposals(runId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: keys.runProposals(runId ?? ""),
+    queryFn: () => call(api.GET("/api/runs/{runId}/bible-proposals", { params: { path: { runId: runId! } } })),
+    enabled: !!runId && enabled,
   });
 }

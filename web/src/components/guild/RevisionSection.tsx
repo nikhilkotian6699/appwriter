@@ -41,7 +41,7 @@ type Props = {
   /** A proposed revision found on load, to review without a run. */
   pending: Revision | null;
   chapterId: string;
-  onApplied: (chapter: Chapter) => void;
+  onApplied: (chapter: Chapter, bibleRunId: string | null) => void;
 };
 
 /** RevisionSection follows a revision run and opens the review dialog when the lead writer is done. */
@@ -140,9 +140,9 @@ export function RevisionSection({ runId, pending, chapterId, onApplied }: Props)
         revision={rev ?? null}
         open={open && !!rev}
         onClose={() => setOpen(false)}
-        onApplied={(chapter) => {
+        onApplied={(chapter, _revision, bibleRunId) => {
           setOpen(false);
-          onApplied(chapter);
+          onApplied(chapter, bibleRunId);
         }}
         onDiscarded={() => setOpen(false)}
       />

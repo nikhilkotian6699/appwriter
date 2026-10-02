@@ -39,6 +39,16 @@ var bibleFieldOrder = []string{"text", "role", "voice", "arc", "facts", "key_fac
 // BibleContext renders the story bible as Markdown for a prompt. Empty
 // sections are skipped; an empty bible yields a short note instead.
 func BibleContext(entries []sqlcgen.BibleEntry) string {
+	return bibleContext(entries, false)
+}
+
+// BibleContextWithIDs renders the bible with each entry's id in front, so a
+// reply can name the entry it wants to change.
+func BibleContextWithIDs(entries []sqlcgen.BibleEntry) string {
+	return bibleContext(entries, true)
+}
+
+func bibleContext(entries []sqlcgen.BibleEntry, withIDs bool) string {
 	bySection := map[string][]sqlcgen.BibleEntry{}
 	for _, e := range entries {
 		bySection[e.Section] = append(bySection[e.Section], e)
@@ -56,10 +66,12 @@ func BibleContext(entries []sqlcgen.BibleEntry) string {
 			if title == "" && len(fields) == 0 {
 				continue
 			}
+			b.WriteString("-")
+			if withIDs {
+				fmt.Fprintf(&b, " [%s]", e.ID)
+			}
 			if title != "" {
-				fmt.Fprintf(&b, "- **%s**", title)
-			} else {
-				b.WriteString("-")
+				fmt.Fprintf(&b, " **%s**", title)
 			}
 			for i, f := range fields {
 				if i == 0 && title != "" {

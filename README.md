@@ -149,6 +149,23 @@ applied. In the app the review dialog shows every change before and after,
 side by side, with a checkbox per change: accept all, accept the selected
 ones, or discard.
 
+### Keeping the story bible (bible keeper)
+
+Applying a revision starts a bible update run (`bible_update`; also
+`POST /api/chapters/{id}/bible-updates` by hand). The bible keeper (system
+agent `bible-keeper`) receives the story bible with each entry's id, the
+chapter as it now stands and the changes the revision made, and returns
+proposals: add an entry, update one (the fields as they should read), or
+delete one, each with a one-sentence rationale. Proposals are validated
+(action, section, rationale; unknown entry ids are dropped with a note) and
+stored in `bible_proposals`; nothing touches the bible until the author
+decides. `PUT /api/bible-proposals/{id}` with `approved` applies the
+proposal (optionally with an edited title and fields), `rejected` drops it.
+Pending proposals are listed at `GET /api/projects/{id}/bible/proposals`
+and shown at the top of the story bible page; the Guild panel shows the
+keeper's proposals right after the revision. Events: `bible.started`,
+`bible.delta`, `bible.retry`, `bible.done`.
+
 ### Runs and event streams
 
 Every workflow is a run (`runs` table) executed in the background by the run

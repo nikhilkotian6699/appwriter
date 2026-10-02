@@ -221,6 +221,7 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 
 	e.createEditor("writersguild-editor")
 	e.createSystemWriter("Lead writer", "lead-writer", "writersguild-lead")
+	e.createSystemWriter("Bible keeper", "bible-keeper", "writersguild-keeper")
 	var editorFails atomic.Bool
 	critic := []WriterRole{"critic"}
 	good := e.createWriter("Good", "writersguild-good", critic, true)
@@ -231,6 +232,19 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 
 	var flakyCalls atomic.Int32
 	e.mock.StreamFn = func(ctx context.Context, req llm.Request, onDelta func(string)) (*llm.Response, error) {
+		if req.Metadata.GenerationName == "bible-keeper" {
+			if req.Model != "writersguild-keeper" || !req.JSONMode || !strings.Contains(req.Messages[1].Content, "# What the revision changed") {
+				t.Errorf("bible keeper request wrong: model %q json %v", req.Model, req.JSONMode)
+			}
+			ids := regexp.MustCompile(`- \[([0-9a-f-]{36})\]`).FindStringSubmatch(req.Messages[1].Content)
+			proposals := []map[string]any{}
+			if ids != nil {
+				proposals = append(proposals, map[string]any{"action": "update", "entry_id": ids[1], "section": "character", "fields": map[string]string{"arc": "waits for the boats"}, "rationale": "She waits."})
+			}
+			proposals = append(proposals, map[string]any{"action": "add", "section": "character", "title": "The porter", "fields": map[string]string{"role": "porter"}, "rationale": "He is gone by morning."})
+			b, _ := json.Marshal(map[string]any{"proposals": proposals})
+			return streamJSON(string(b), onDelta), nil
+		}
 		if req.Metadata.GenerationName == "lead-writer" {
 			if req.Model != "writersguild-lead" || req.JSONMode || !strings.Contains(req.Messages[1].Content, "# Accepted notes to apply") {
 				t.Errorf("lead writer request wrong: model %q json %v", req.Model, req.JSONMode)
@@ -417,6 +431,84 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	if len(versions) == 0 || versions[0].Kind != "pre_revision" || versions[0].ContentHash != ch.ContentHash {
 		t.Fatalf("expected a pre_revision snapshot first: %+v", versions)
 	}
+
+	// Applying the revision started the bible keeper: an update of Mara and a
+	// new character, waiting for decisions.
+	if applied.BibleRunId == nil {
+		t.Fatal("apply should start a bible update run")
+	}
+	if err := e.engine.Wait(waitCtx, *applied.BibleRunId); err != nil {
+		t.Fatal(err)
+	}
+	var bibleRun Run
+	e.want(e.do("GET", "/api/runs/"+applied.BibleRunId.String(), nil, &bibleRun), 200, "GET", "bible run")
+	if bibleRun.Kind != "bible_update" || bibleRun.Status != "succeeded" || (*bibleRun.Result)["proposals"] != float64(2) {
+		t.Fatalf("bible run %+v", bibleRun)
+	}
+	var proposals []BibleProposal
+	e.want(e.do("GET", "/api/runs/"+applied.BibleRunId.String()+"/bible-proposals", nil, &proposals), 200, "GET", "run proposals")
+	if len(proposals) != 2 || proposals[0].Action != "update" || proposals[1].Action != "add" {
+		t.Fatalf("proposals %+v", proposals)
+	}
+	upd, add := proposals[0], proposals[1]
+	if upd.Current == nil || upd.Current.Title != "Mara" || upd.Fields["role"] != "harbour master" || upd.Fields["arc"] != "waits for the boats" || upd.Status != "pending" || upd.RevisionId == nil {
+		t.Fatalf("update proposal %+v", upd)
+	}
+	var pending []BibleProposal
+	e.want(e.do("GET", "/api/projects/"+p.Id.String()+"/bible/proposals?status=pending", nil, &pending), 200, "GET", "pending proposals")
+	if len(pending) != 2 {
+		t.Fatalf("pending %d", len(pending))
+	}
+	bibleEvents := map[string]int{}
+	for _, ev := range e.streamEvents(*applied.BibleRunId) {
+		bibleEvents[ev.Type]++
+	}
+	if bibleEvents[guild.EventBibleStarted] != 1 || bibleEvents[guild.EventBibleDelta] < 1 || bibleEvents[guild.EventBibleDone] != 1 {
+		t.Fatalf("bible events %v", bibleEvents)
+	}
+	// Edit and approve the addition; the entry appears in the bible.
+	var pdecided BibleProposal
+	e.want(e.do("PUT", "/api/bible-proposals/"+add.Id.String(), BibleProposalDecisionInput{Decision: "approved", Title: ptr("Tomas the porter"), Fields: ptr(map[string]string{"role": "porter", "voice": "gruff"})}, &pdecided), 200, "PUT", "approve add")
+	if pdecided.Status != "approved" || pdecided.AppliedEntryId == nil || pdecided.Title != "Tomas the porter" || pdecided.Fields["voice"] != "gruff" {
+		t.Fatalf("approved add %+v", decided)
+	}
+	var entries []BibleEntry
+	e.want(e.do("GET", "/api/projects/"+p.Id.String()+"/bible", nil, &entries), 200, "GET", "bible")
+	found := false
+	for _, en := range entries {
+		if en.Id == *pdecided.AppliedEntryId && en.Title == "Tomas the porter" && en.Section == "character" && en.Fields["voice"] == "gruff" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("approved entry missing from the bible: %+v", entries)
+	}
+	// Reject the update; Mara is unchanged.
+	e.want(e.do("PUT", "/api/bible-proposals/"+upd.Id.String(), BibleProposalDecisionInput{Decision: "rejected"}, &pdecided), 200, "PUT", "reject update")
+	if pdecided.Status != "rejected" || pdecided.AppliedEntryId != nil {
+		t.Fatalf("rejected %+v", decided)
+	}
+	e.want(e.do("GET", "/api/projects/"+p.Id.String()+"/bible", nil, &entries), 200, "GET", "bible")
+	for _, en := range entries {
+		if en.Title == "Mara" && en.Fields["arc"] != "" {
+			t.Fatal("a rejected update must not change the entry")
+		}
+	}
+	e.want(e.do("PUT", "/api/bible-proposals/"+upd.Id.String(), BibleProposalDecisionInput{Decision: "approved"}, nil), 409, "PUT", "decide twice")
+	e.want(e.do("PUT", "/api/bible-proposals/"+add.Id.String(), map[string]string{"decision": "maybe"}, nil), 400, "PUT", "bad decision")
+	e.want(e.do("PUT", "/api/bible-proposals/"+uuid.New().String(), BibleProposalDecisionInput{Decision: "rejected"}, nil), 404, "PUT", "unknown proposal")
+	e.want(e.do("GET", "/api/projects/"+p.Id.String()+"/bible/proposals?status=pending", nil, &pending), 200, "GET", "pending proposals")
+	if len(pending) != 0 {
+		t.Fatalf("pending after decisions %d", len(pending))
+	}
+	// A bible update can also be asked for by hand, naming an applied revision.
+	var manual Run
+	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/bible-updates", BibleUpdateStartInput{RevisionId: ptr(applied.Revision.Id)}, &manual), 202, "POST", "manual bible update")
+	_ = e.engine.Wait(waitCtx, manual.Id)
+	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/bible-updates", BibleUpdateStartInput{RevisionId: ptr(uuid.New())}, nil), 404, "POST", "bible update unknown revision")
+	other.want(other.do("GET", "/api/runs/"+applied.BibleRunId.String()+"/bible-proposals", nil, nil), 404, "GET", "other's proposals")
+	other.want(other.do("PUT", "/api/bible-proposals/"+add.Id.String(), BibleProposalDecisionInput{Decision: "rejected"}, nil), 404, "PUT", "other's decision")
+	other.want(other.do("GET", "/api/projects/"+p.Id.String()+"/bible/proposals", nil, nil), 404, "GET", "other's project proposals")
 	e.want(e.do("POST", "/api/revisions/"+revID+"/apply", nil, nil), 409, "POST", "apply twice")
 	e.want(e.do("POST", "/api/revisions/"+revID+"/discard", nil, nil), 409, "POST", "discard applied")
 	e.want(e.do("GET", "/api/chapters/"+ch.Id.String(), nil, &ch), 200, "GET", "chapter")

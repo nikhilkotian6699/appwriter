@@ -8,7 +8,7 @@ type Props = {
   revision: Revision | null;
   open: boolean;
   onClose: () => void;
-  onApplied: (chapter: Chapter, revision: Revision) => void;
+  onApplied: (chapter: Chapter, revision: Revision, bibleRunId: string | null) => void;
   onDiscarded: (revision: Revision) => void;
 };
 
@@ -27,7 +27,7 @@ export function RevisionDialog({ revision, open, onClose, onApplied, onDiscarded
       qc.setQueryData(keys.revision(res.revision.id), res.revision);
       qc.invalidateQueries({ queryKey: keys.chapterRevisions(res.chapter.id) });
       qc.invalidateQueries({ queryKey: keys.versions(res.chapter.id) });
-      onApplied(res.chapter, res.revision);
+      onApplied(res.chapter, res.revision, res.bible_run_id ?? null);
     },
   });
   const discard = useMutation({

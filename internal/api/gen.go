@@ -14,6 +14,24 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for BibleProposalDecisionInputDecision.
+const (
+	BibleProposalDecisionInputDecisionApproved BibleProposalDecisionInputDecision = "approved"
+	BibleProposalDecisionInputDecisionRejected BibleProposalDecisionInputDecision = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the BibleProposalDecisionInputDecision enum.
+func (e BibleProposalDecisionInputDecision) Valid() bool {
+	switch e {
+	case BibleProposalDecisionInputDecisionApproved:
+		return true
+	case BibleProposalDecisionInputDecisionRejected:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BibleSection.
 const (
 	BibleSectionChapterSummary BibleSection = "chapter_summary"
@@ -118,19 +136,19 @@ func (e CritiqueStatus) Valid() bool {
 
 // Defines values for DiffOpKind.
 const (
-	Delete DiffOpKind = "delete"
-	Equal  DiffOpKind = "equal"
-	Insert DiffOpKind = "insert"
+	DiffOpKindDelete DiffOpKind = "delete"
+	DiffOpKindEqual  DiffOpKind = "equal"
+	DiffOpKindInsert DiffOpKind = "insert"
 )
 
 // Valid indicates whether the value is a known member of the DiffOpKind enum.
 func (e DiffOpKind) Valid() bool {
 	switch e {
-	case Delete:
+	case DiffOpKindDelete:
 		return true
-	case Equal:
+	case DiffOpKindEqual:
 		return true
-	case Insert:
+	case DiffOpKindInsert:
 		return true
 	default:
 		return false
@@ -139,19 +157,19 @@ func (e DiffOpKind) Valid() bool {
 
 // Defines values for IssueDecision.
 const (
-	Accepted IssueDecision = "accepted"
-	Pending  IssueDecision = "pending"
-	Rejected IssueDecision = "rejected"
+	IssueDecisionAccepted IssueDecision = "accepted"
+	IssueDecisionPending  IssueDecision = "pending"
+	IssueDecisionRejected IssueDecision = "rejected"
 )
 
 // Valid indicates whether the value is a known member of the IssueDecision enum.
 func (e IssueDecision) Valid() bool {
 	switch e {
-	case Accepted:
+	case IssueDecisionAccepted:
 		return true
-	case Pending:
+	case IssueDecisionPending:
 		return true
-	case Rejected:
+	case IssueDecisionRejected:
 		return true
 	default:
 		return false
@@ -173,6 +191,48 @@ func (e IssueSeverity) Valid() bool {
 	case Low:
 		return true
 	case Medium:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProposalAction.
+const (
+	ProposalActionAdd    ProposalAction = "add"
+	ProposalActionDelete ProposalAction = "delete"
+	ProposalActionUpdate ProposalAction = "update"
+)
+
+// Valid indicates whether the value is a known member of the ProposalAction enum.
+func (e ProposalAction) Valid() bool {
+	switch e {
+	case ProposalActionAdd:
+		return true
+	case ProposalActionDelete:
+		return true
+	case ProposalActionUpdate:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProposalStatus.
+const (
+	ProposalStatusApproved ProposalStatus = "approved"
+	ProposalStatusPending  ProposalStatus = "pending"
+	ProposalStatusRejected ProposalStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the ProposalStatus enum.
+func (e ProposalStatus) Valid() bool {
+	switch e {
+	case ProposalStatusApproved:
+		return true
+	case ProposalStatusPending:
+		return true
+	case ProposalStatusRejected:
 		return true
 	default:
 		return false
@@ -323,8 +383,47 @@ type BibleEntryInput struct {
 	Title     string              `json:"title"`
 }
 
+// BibleProposal A change to the story bible proposed by the bible keeper, waiting for or carrying the author's decision.
+type BibleProposal struct {
+	Action         ProposalAction      `json:"action"`
+	AppliedEntryId *openapi_types.UUID `json:"applied_entry_id,omitempty"`
+	ChapterId      *openapi_types.UUID `json:"chapter_id,omitempty"`
+	CreatedAt      time.Time           `json:"created_at"`
+	Current        *BibleEntry         `json:"current,omitempty"`
+	DecidedAt      *time.Time          `json:"decided_at,omitempty"`
+
+	// EntryId The entry to update or delete
+	EntryId    *openapi_types.UUID `json:"entry_id,omitempty"`
+	Fields     map[string]string   `json:"fields"`
+	Id         openapi_types.UUID  `json:"id"`
+	Position   int                 `json:"position"`
+	ProjectId  openapi_types.UUID  `json:"project_id"`
+	Rationale  string              `json:"rationale"`
+	RevisionId *openapi_types.UUID `json:"revision_id,omitempty"`
+	RunId      openapi_types.UUID  `json:"run_id"`
+	Section    BibleSection        `json:"section"`
+	Status     ProposalStatus      `json:"status"`
+	Title      string              `json:"title"`
+}
+
+// BibleProposalDecisionInput defines model for BibleProposalDecisionInput.
+type BibleProposalDecisionInput struct {
+	Decision BibleProposalDecisionInputDecision `json:"decision"`
+	Fields   *map[string]string                 `json:"fields,omitempty"`
+	Title    *string                            `json:"title,omitempty"`
+}
+
+// BibleProposalDecisionInputDecision defines model for BibleProposalDecisionInput.Decision.
+type BibleProposalDecisionInputDecision string
+
 // BibleSection defines model for BibleSection.
 type BibleSection string
+
+// BibleUpdateStartInput defines model for BibleUpdateStartInput.
+type BibleUpdateStartInput struct {
+	// RevisionId The applied revision whose changes the keeper should consider
+	RevisionId *openapi_types.UUID `json:"revision_id,omitempty"`
+}
 
 // Chapter defines model for Chapter.
 type Chapter struct {
@@ -591,6 +690,12 @@ type ProjectSummary struct {
 	UpdatedAt    time.Time          `json:"updated_at"`
 }
 
+// ProposalAction defines model for ProposalAction.
+type ProposalAction string
+
+// ProposalStatus defines model for ProposalStatus.
+type ProposalStatus string
+
 // Revision A revised text proposed by the lead writer, as word-level hunks over the chapter.
 type Revision struct {
 	AppliedHunks  *[]int               `json:"applied_hunks,omitempty"`
@@ -621,7 +726,9 @@ type RevisionApplyInput struct {
 
 // RevisionApplyResult defines model for RevisionApplyResult.
 type RevisionApplyResult struct {
-	Chapter Chapter `json:"chapter"`
+	// BibleRunId The bible update run started by the apply
+	BibleRunId *openapi_types.UUID `json:"bible_run_id,omitempty"`
+	Chapter    Chapter             `json:"chapter"`
 
 	// Revision A revised text proposed by the lead writer, as word-level hunks over the chapter.
 	Revision Revision `json:"revision"`
@@ -773,6 +880,9 @@ type IssueId = openapi_types.UUID
 // ProjectId defines model for projectId.
 type ProjectId = openapi_types.UUID
 
+// ProposalId defines model for proposalId.
+type ProposalId = openapi_types.UUID
+
 // RevisionId defines model for revisionId.
 type RevisionId = openapi_types.UUID
 
@@ -800,6 +910,12 @@ type ListChapterRunsParams struct {
 	Limit *int     `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListProjectBibleProposalsParams defines parameters for ListProjectBibleProposals.
+type ListProjectBibleProposalsParams struct {
+	Status *ProposalStatus `form:"status,omitempty" json:"status,omitempty"`
+	Limit  *int            `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // StreamRunEventsParams defines parameters for StreamRunEvents.
 type StreamRunEventsParams struct {
 	After *int `form:"after,omitempty" json:"after,omitempty"`
@@ -808,8 +924,14 @@ type StreamRunEventsParams struct {
 // UpdateBibleEntryJSONRequestBody defines body for UpdateBibleEntry for application/json ContentType.
 type UpdateBibleEntryJSONRequestBody = BibleEntryInput
 
+// DecideBibleProposalJSONRequestBody defines body for DecideBibleProposal for application/json ContentType.
+type DecideBibleProposalJSONRequestBody = BibleProposalDecisionInput
+
 // UpdateChapterJSONRequestBody defines body for UpdateChapter for application/json ContentType.
 type UpdateChapterJSONRequestBody = ChapterMetaInput
+
+// StartBibleUpdateJSONRequestBody defines body for StartBibleUpdate for application/json ContentType.
+type StartBibleUpdateJSONRequestBody = BibleUpdateStartInput
 
 // SaveChapterContentJSONRequestBody defines body for SaveChapterContent for application/json ContentType.
 type SaveChapterContentJSONRequestBody = ChapterContentInput
@@ -861,6 +983,9 @@ type ServerInterface interface {
 
 	// (PUT /api/bible-entries/{entryId})
 	UpdateBibleEntry(w http.ResponseWriter, r *http.Request, entryId EntryId)
+	// DecideBibleProposal Approve (optionally edited) or reject a story bible proposal
+	// (PUT /api/bible-proposals/{proposalId})
+	DecideBibleProposal(w http.ResponseWriter, r *http.Request, proposalId ProposalId)
 
 	// (DELETE /api/chapters/{chapterId})
 	DeleteChapter(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
@@ -870,6 +995,9 @@ type ServerInterface interface {
 	// UpdateChapter Rename or move a chapter
 	// (PUT /api/chapters/{chapterId})
 	UpdateChapter(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
+	// StartBibleUpdate Ask the bible keeper what the chapter changes in the story bible
+	// (POST /api/chapters/{chapterId}/bible-updates)
+	StartBibleUpdate(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
 	// SaveChapterContent Save the chapter text; may create an autosave snapshot
 	// (PUT /api/chapters/{chapterId}/content)
 	SaveChapterContent(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
@@ -927,6 +1055,9 @@ type ServerInterface interface {
 
 	// (POST /api/projects/{projectId}/bible)
 	CreateBibleEntry(w http.ResponseWriter, r *http.Request, projectId ProjectId)
+	// ListProjectBibleProposals Story bible proposals of a project, newest first
+	// (GET /api/projects/{projectId}/bible/proposals)
+	ListProjectBibleProposals(w http.ResponseWriter, r *http.Request, projectId ProjectId, params ListProjectBibleProposalsParams)
 
 	// (GET /api/projects/{projectId}/chapters)
 	ListChapters(w http.ResponseWriter, r *http.Request, projectId ProjectId)
@@ -945,6 +1076,9 @@ type ServerInterface interface {
 
 	// (GET /api/runs/{runId})
 	GetRun(w http.ResponseWriter, r *http.Request, runId RunId)
+	// ListRunBibleProposals The proposals a bible update run produced
+	// (GET /api/runs/{runId}/bible-proposals)
+	ListRunBibleProposals(w http.ResponseWriter, r *http.Request, runId RunId)
 	// CancelRun Stop a running run; a finished run is returned unchanged
 	// (POST /api/runs/{runId}/cancel)
 	CancelRun(w http.ResponseWriter, r *http.Request, runId RunId)
@@ -1000,6 +1134,12 @@ func (_ Unimplemented) UpdateBibleEntry(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// DecideBibleProposal Approve (optionally edited) or reject a story bible proposal
+// (PUT /api/bible-proposals/{proposalId})
+func (_ Unimplemented) DecideBibleProposal(w http.ResponseWriter, r *http.Request, proposalId ProposalId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (DELETE /api/chapters/{chapterId})
 func (_ Unimplemented) DeleteChapter(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1013,6 +1153,12 @@ func (_ Unimplemented) GetChapter(w http.ResponseWriter, r *http.Request, chapte
 // UpdateChapter Rename or move a chapter
 // (PUT /api/chapters/{chapterId})
 func (_ Unimplemented) UpdateChapter(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// StartBibleUpdate Ask the bible keeper what the chapter changes in the story bible
+// (POST /api/chapters/{chapterId}/bible-updates)
+func (_ Unimplemented) StartBibleUpdate(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1121,6 +1267,12 @@ func (_ Unimplemented) CreateBibleEntry(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListProjectBibleProposals Story bible proposals of a project, newest first
+// (GET /api/projects/{projectId}/bible/proposals)
+func (_ Unimplemented) ListProjectBibleProposals(w http.ResponseWriter, r *http.Request, projectId ProjectId, params ListProjectBibleProposalsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/projects/{projectId}/chapters)
 func (_ Unimplemented) ListChapters(w http.ResponseWriter, r *http.Request, projectId ProjectId) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1150,6 +1302,12 @@ func (_ Unimplemented) DiscardRevision(w http.ResponseWriter, r *http.Request, r
 
 // (GET /api/runs/{runId})
 func (_ Unimplemented) GetRun(w http.ResponseWriter, r *http.Request, runId RunId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListRunBibleProposals The proposals a bible update run produced
+// (GET /api/runs/{runId}/bible-proposals)
+func (_ Unimplemented) ListRunBibleProposals(w http.ResponseWriter, r *http.Request, runId RunId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1284,6 +1442,32 @@ func (siw *ServerInterfaceWrapper) UpdateBibleEntry(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// DecideBibleProposal operation middleware
+func (siw *ServerInterfaceWrapper) DecideBibleProposal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "proposalId" -------------
+	var proposalId ProposalId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "proposalId", chi.URLParam(r, "proposalId"), &proposalId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "proposalId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DecideBibleProposal(w, r, proposalId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteChapter operation middleware
 func (siw *ServerInterfaceWrapper) DeleteChapter(w http.ResponseWriter, r *http.Request) {
 
@@ -1353,6 +1537,32 @@ func (siw *ServerInterfaceWrapper) UpdateChapter(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateChapter(w, r, chapterId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartBibleUpdate operation middleware
+func (siw *ServerInterfaceWrapper) StartBibleUpdate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "chapterId" -------------
+	var chapterId ChapterId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "chapterId", chi.URLParam(r, "chapterId"), &chapterId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "chapterId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartBibleUpdate(w, r, chapterId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1884,6 +2094,61 @@ func (siw *ServerInterfaceWrapper) CreateBibleEntry(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListProjectBibleProposals operation middleware
+func (siw *ServerInterfaceWrapper) ListProjectBibleProposals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", chi.URLParam(r, "projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "projectId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListProjectBibleProposalsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListProjectBibleProposals(w, r, projectId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListChapters operation middleware
 func (siw *ServerInterfaceWrapper) ListChapters(w http.ResponseWriter, r *http.Request) {
 
@@ -2031,6 +2296,32 @@ func (siw *ServerInterfaceWrapper) GetRun(w http.ResponseWriter, r *http.Request
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetRun(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRunBibleProposals operation middleware
+func (siw *ServerInterfaceWrapper) ListRunBibleProposals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRunBibleProposals(w, r, runId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2545,6 +2836,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/revisions/{revisionId}/discard", wrapper.DiscardRevision)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/chapters/{chapterId}/bible-updates", wrapper.StartBibleUpdate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/projects/{projectId}/bible/proposals", wrapper.ListProjectBibleProposals)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/runs/{runId}/bible-proposals", wrapper.ListRunBibleProposals)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/bible-proposals/{proposalId}", wrapper.DecideBibleProposal)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}", wrapper.GetRun)

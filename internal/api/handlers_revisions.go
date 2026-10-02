@@ -253,13 +253,15 @@ func (s *Server) ApplyRevision(w http.ResponseWriter, r *http.Request, revisionI
 		s.fail(w, err)
 		return
 	}
-	s.afterRevisionApplied(r, u, updated, row)
-	writeJSON(w, http.StatusOK, RevisionApplyResult{Chapter: toChapter(updated), Revision: out})
-}
-
-// afterRevisionApplied is the hook for follow-up work once a revision has
-// changed the chapter (the bible keeper, in a later milestone).
-func (s *Server) afterRevisionApplied(_ *http.Request, _ sqlcgen.User, _ sqlcgen.Chapter, _ sqlcgen.Revision) {
+	result := RevisionApplyResult{Chapter: toChapter(updated), Revision: out}
+	// The bible keeper looks at what changed; a failure to start it never
+	// undoes the revision.
+	if bibleRun, err := s.startBibleUpdate(ctx, u, updated, &row); err != nil {
+		s.log.Error("start bible update after revision", "revision", row.ID, "err", err)
+	} else {
+		result.BibleRunId = ptr(bibleRun.Row.ID)
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // DiscardRevision drops a proposed revision without touching the chapter.

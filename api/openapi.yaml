@@ -527,6 +527,98 @@ paths:
               schema: { $ref: "#/components/schemas/Revision" }
         default: { $ref: "#/components/responses/Error" }
 
+  /api/chapters/{chapterId}/bible-updates:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+    post:
+      operationId: startBibleUpdate
+      summary: Ask the bible keeper what the chapter changes in the story bible
+      description: |
+        Starts a bible update run in the background and returns it at once.
+        It also starts by itself when a revision is applied. Events:
+        `bible.started`, `bible.delta`, `bible.retry`, `bible.done` (with the
+        stored proposals), then `run.finished`. Proposals wait for the
+        author's decision at `GET /api/projects/{projectId}/bible/proposals`.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BibleUpdateStartInput" }
+      responses:
+        "202":
+          description: The run that was started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/projects/{projectId}/bible/proposals:
+    parameters:
+      - $ref: "#/components/parameters/projectId"
+    get:
+      operationId: listProjectBibleProposals
+      summary: Story bible proposals of a project, newest first
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/ProposalStatus" }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BibleProposal" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/runs/{runId}/bible-proposals:
+    parameters:
+      - $ref: "#/components/parameters/runId"
+    get:
+      operationId: listRunBibleProposals
+      summary: The proposals a bible update run produced
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BibleProposal" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/bible-proposals/{proposalId}:
+    parameters:
+      - $ref: "#/components/parameters/proposalId"
+    put:
+      operationId: decideBibleProposal
+      summary: Approve (optionally edited) or reject a story bible proposal
+      description: |
+        `approved` applies the proposal to the story bible: an addition
+        creates the entry, an update rewrites the entry's title and fields,
+        a deletion removes it. `title` and `fields` in the body replace the
+        proposal's own before it is applied ("edit and approve"). A proposal
+        can be decided once; an update or deletion whose entry no longer
+        exists fails with 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BibleProposalDecisionInput" }
+      responses:
+        "200":
+          description: The proposal after the decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BibleProposal" }
+        default: { $ref: "#/components/responses/Error" }
+
   /api/runs/{runId}:
     parameters:
       - $ref: "#/components/parameters/runId"
@@ -708,6 +800,11 @@ components:
       schema: { type: string, format: uuid }
     revisionId:
       name: revisionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    proposalId:
+      name: proposalId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1253,3 +1350,52 @@ components:
       properties:
         chapter: { $ref: "#/components/schemas/Chapter" }
         revision: { $ref: "#/components/schemas/Revision" }
+        bible_run_id: { type: string, format: uuid, description: The bible update run started by the apply, when one was }
+
+    ProposalAction:
+      type: string
+      enum: [add, update, delete]
+
+    ProposalStatus:
+      type: string
+      enum: [pending, approved, rejected]
+
+    BibleProposal:
+      type: object
+      description: A change to the story bible proposed by the bible keeper, waiting for or carrying the author's decision.
+      required: [id, run_id, project_id, action, section, title, fields, rationale, status, position, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        chapter_id: { type: string, format: uuid }
+        revision_id: { type: string, format: uuid }
+        action: { $ref: "#/components/schemas/ProposalAction" }
+        entry_id: { type: string, format: uuid, description: The entry to update or delete }
+        current: { $ref: "#/components/schemas/BibleEntry" }
+        section: { $ref: "#/components/schemas/BibleSection" }
+        title: { type: string }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+        rationale: { type: string }
+        status: { $ref: "#/components/schemas/ProposalStatus" }
+        applied_entry_id: { type: string, format: uuid }
+        position: { type: integer }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+
+    BibleProposalDecisionInput:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approved, rejected] }
+        title: { type: string, maxLength: 300 }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+
+    BibleUpdateStartInput:
+      type: object
+      properties:
+        revision_id: { type: string, format: uuid, description: The applied revision whose changes the keeper should consider }

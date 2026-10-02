@@ -23,6 +23,26 @@ type BibleEntry struct {
 	UpdatedAt time.Time
 }
 
+type BibleProposal struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	RunID          uuid.UUID
+	ProjectID      uuid.UUID
+	ChapterID      uuid.NullUUID
+	RevisionID     uuid.NullUUID
+	Action         string
+	EntryID        uuid.NullUUID
+	Section        string
+	Title          string
+	Fields         []byte
+	Rationale      string
+	Status         string
+	AppliedEntryID uuid.NullUUID
+	Position       int32
+	CreatedAt      time.Time
+	DecidedAt      *time.Time
+}
+
 type Chapter struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID

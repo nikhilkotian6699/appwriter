@@ -39,6 +39,10 @@ export type DiffOp = Schemas["DiffOp"];
 export type DiffStats = Schemas["DiffStats"];
 export type SkippedIssue = Schemas["SkippedIssue"];
 export type RevisionApplyResult = Schemas["RevisionApplyResult"];
+export type BibleProposal = Schemas["BibleProposal"];
+export type ProposalAction = Schemas["ProposalAction"];
+export type ProposalStatus = Schemas["ProposalStatus"];
+export type BibleProposalDecisionInput = Schemas["BibleProposalDecisionInput"];
 
 /** ApiError carries the server's stable error code alongside the message. */
 export class ApiError extends Error {
