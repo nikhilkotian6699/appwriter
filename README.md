@@ -202,6 +202,16 @@ is estimated from token counts and `GET /model/info` prices and shown with
 "est." wherever it appears. In the app, "History" on a chapter opens the page
 (the snapshot panel is "Versions").
 
+### Writer stats
+
+`GET /api/stats/writers?period=7d|30d|90d|all&project_id=` gives, for every
+writer of the account, the issues on the editor-in-chief's list that cite the
+writer (an issue counts for every critic who raised it) with the author's
+decisions and acceptance rate, the drafts the writer finished and how many
+went into the chapter, and cost, tokens and calls per kind of run. The Stats
+page (nav "Stats") shows it with period, project and sort controls; writers
+with nothing in the period fold away.
+
 ### Runs and event streams
 
 Every workflow is a run (`runs` table) executed in the background by the run

@@ -751,6 +751,34 @@ paths:
                 items: { $ref: "#/components/schemas/ModelCall" }
         default: { $ref: "#/components/responses/Error" }
 
+  /api/stats/writers:
+    get:
+      operationId: getWriterStats
+      summary: Acceptance rates and cost per writer, by period and project
+      description: |
+        For every writer of the account: issues on the editor-in-chief's list
+        that cite the writer (an issue counts for every critic it cites) with
+        the author's decisions and the resulting acceptance rate, drafts and
+        how many went into the chapter, and cost, tokens and calls per kind
+        of run. `period` restricts to the last 7, 30 or 90 days; `project_id`
+        to one novel (writer tests belong to no project and drop out then).
+      parameters:
+        - name: period
+          in: query
+          required: false
+          schema: { type: string, enum: [7d, 30d, 90d, all], default: all }
+        - name: project_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriterStatsPage" }
+        default: { $ref: "#/components/responses/Error" }
+
   /api/runs/{runId}:
     parameters:
       - $ref: "#/components/parameters/runId"
@@ -1705,3 +1733,70 @@ components:
         status: { type: string, enum: [ok, error] }
         error: { type: string }
         created_at: { type: string, format: date-time }
+
+    KindCost:
+      type: object
+      required: [kind, calls, cost_usd, cost_estimated, prompt_tokens, completion_tokens]
+      properties:
+        kind: { type: string, description: A run kind, or "other" for calls outside a run }
+        calls: { type: integer }
+        cost_usd: { type: number, format: double }
+        cost_estimated: { type: boolean }
+        prompt_tokens: { type: integer, format: int64 }
+        completion_tokens: { type: integer, format: int64 }
+
+    IssueStats:
+      type: object
+      required: [listed, accepted, rejected, pending]
+      properties:
+        listed: { type: integer, description: Issues on the editor-in-chief's list that cite this writer }
+        accepted: { type: integer }
+        rejected: { type: integer }
+        pending: { type: integer }
+        acceptance_rate: { type: number, format: double, description: accepted / (accepted + rejected); absent until something was decided }
+
+    DraftStats:
+      type: object
+      required: [count, used, discarded, pending]
+      properties:
+        count: { type: integer, description: Drafts the writer finished }
+        used: { type: integer, description: Inserted or replaced }
+        discarded: { type: integer }
+        pending: { type: integer }
+        acceptance_rate: { type: number, format: double, description: used / (used + discarded); absent until something was decided }
+
+    WriterStats:
+      type: object
+      required: [writer_id, name, slug, model_alias, enabled, is_system, roles, critiques, issues, drafts, calls, cost_usd, cost_estimated, prompt_tokens, completion_tokens, by_kind]
+      properties:
+        writer_id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        model_alias: { type: string }
+        enabled: { type: boolean }
+        is_system: { type: boolean }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/WriterRole" }
+        critiques: { type: integer, description: Critiques the writer finished }
+        issues: { $ref: "#/components/schemas/IssueStats" }
+        drafts: { $ref: "#/components/schemas/DraftStats" }
+        calls: { type: integer }
+        cost_usd: { type: number, format: double }
+        cost_estimated: { type: boolean }
+        prompt_tokens: { type: integer, format: int64 }
+        completion_tokens: { type: integer, format: int64 }
+        by_kind:
+          type: array
+          items: { $ref: "#/components/schemas/KindCost" }
+
+    WriterStatsPage:
+      type: object
+      required: [period, writers, totals]
+      properties:
+        period: { type: string }
+        project_id: { type: string, format: uuid }
+        writers:
+          type: array
+          items: { $ref: "#/components/schemas/WriterStats" }
+        totals: { $ref: "#/components/schemas/KindCost", description: Everything in the period and project, including calls of writers since deleted }

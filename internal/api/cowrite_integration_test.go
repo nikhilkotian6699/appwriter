@@ -186,6 +186,23 @@ func TestIntegrationCowrite(t *testing.T) {
 		}
 	}
 
+	// Writer stats count drafts and what became of them; failed drafts do not count.
+	var stats WriterStatsPage
+	e.want(e.do("GET", "/api/stats/writers?period=30d", nil, &stats), 200, "GET", "stats")
+	statsByName := map[string]WriterStats{}
+	for _, ws := range stats.Writers {
+		statsByName[ws.Name] = ws
+	}
+	if h := statsByName["Hemingway"]; h.Drafts.Count != 2 || h.Drafts.Used != 0 || h.Drafts.Discarded != 1 || h.Drafts.Pending != 1 || h.Drafts.AcceptanceRate == nil || *h.Drafts.AcceptanceRate != 0 || len(h.ByKind) != 2 {
+		t.Fatalf("hemingway draft stats %+v", h.Drafts)
+	}
+	if l := statsByName["Le Guin"]; l.Drafts.Count != 1 || l.Drafts.Used != 1 || l.Drafts.AcceptanceRate == nil || *l.Drafts.AcceptanceRate != 1 || l.Calls != 3 {
+		t.Fatalf("le guin draft stats %+v calls %d", l.Drafts, l.Calls)
+	}
+	if m := statsByName["García Márquez"]; m.Drafts.Count != 1 || m.Drafts.Used != 1 {
+		t.Fatalf("marquez draft stats %+v", m.Drafts)
+	}
+
 	other := newEnv(t)
 	other.want(other.do("POST", "/api/chapters/"+ch.Id.String()+"/drafts", CowriteStartInput{WriterIds: []uuid.UUID{hem.Id}, Instruction: "Go."}, nil), 404, "POST", "other's chapter")
 	other.want(other.do("GET", "/api/runs/"+run.Id.String()+"/drafts", nil, nil), 404, "GET", "other's drafts")

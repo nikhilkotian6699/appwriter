@@ -577,6 +577,63 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	if !seenEditor || !seenError {
 		t.Fatalf("calls should include the editor's call and the failed critic's call: %+v", calls)
 	}
+	// Writer stats: an issue on the editor's list counts for every critic it cites.
+	var stats WriterStatsPage
+	e.want(e.do("GET", "/api/stats/writers", nil, &stats), 200, "GET", "stats")
+	statsByName := map[string]WriterStats{}
+	for _, ws := range stats.Writers {
+		statsByName[ws.Name] = ws
+	}
+	goodStats := statsByName["Good"]
+	if goodStats.Issues.Listed != 4 || goodStats.Issues.Accepted != 1 || goodStats.Issues.Rejected != 1 || goodStats.Issues.Pending != 2 || goodStats.Issues.AcceptanceRate == nil || *goodStats.Issues.AcceptanceRate != 0.5 || goodStats.Critiques != 1 {
+		t.Fatalf("good stats %+v", goodStats)
+	}
+	if fl := statsByName["Flaky"]; fl.Issues.Listed != 4 || fl.Critiques != 1 || fl.Calls < 2 {
+		t.Fatalf("flaky stats %+v", fl)
+	}
+	if fs := statsByName["Failing"]; fs.Issues.Listed != 0 || fs.Critiques != 0 || fs.Calls == 0 || fs.CostUsd != 0 {
+		t.Fatalf("failing stats %+v (failed calls cost nothing but are counted)", fs)
+	}
+	kindOf := func(ws WriterStats, kind string) *KindCost {
+		for i := range ws.ByKind {
+			if ws.ByKind[i].Kind == kind {
+				return &ws.ByKind[i]
+			}
+		}
+		return nil
+	}
+	if ed := statsByName["Editor-in-chief"]; kindOf(ed, "critique") == nil || kindOf(ed, "critique").CostUsd <= 0 || ed.Issues.Listed != 0 {
+		t.Fatalf("editor stats %+v", ed)
+	}
+	if lw := statsByName["Lead writer"]; kindOf(lw, "revision") == nil || kindOf(lw, "revision").Calls != 1 {
+		t.Fatalf("lead writer stats %+v", lw)
+	}
+	if bk := statsByName["Bible keeper"]; kindOf(bk, "bible_update") == nil {
+		t.Fatalf("bible keeper stats %+v", bk)
+	}
+	if stats.Totals.Calls < 6 || stats.Totals.CostUsd <= 0 || !stats.Totals.CostEstimated || stats.Period != "all" {
+		t.Fatalf("stats totals %+v", stats.Totals)
+	}
+	e.want(e.do("GET", "/api/stats/writers?period=7d&project_id="+p.Id.String(), nil, &stats), 200, "GET", "stats period+project")
+	for _, ws := range stats.Writers {
+		if ws.Name == "Good" && (ws.Issues.Listed != 4 || ws.Issues.Accepted != 1) {
+			t.Fatalf("good stats within 7d and project %+v", ws.Issues)
+		}
+	}
+	var otherProject Project
+	e.want(e.do("POST", "/api/projects", ProjectInput{Name: "Elsewhere"}, &otherProject), 201, "POST", "/api/projects")
+	e.want(e.do("GET", "/api/stats/writers?project_id="+otherProject.Id.String(), nil, &stats), 200, "GET", "stats other project")
+	for _, ws := range stats.Writers {
+		if ws.Issues.Listed != 0 || ws.Calls != 0 {
+			t.Fatalf("another project should show nothing: %+v", ws)
+		}
+	}
+	e.want(e.do("GET", "/api/stats/writers?period=2d", nil, nil), 400, "GET", "stats bad period")
+	e.want(e.do("GET", "/api/stats/writers?project_id="+uuid.New().String(), nil, nil), 404, "GET", "stats unknown project")
+	other.want(other.do("GET", "/api/stats/writers", nil, &stats), 200, "GET", "other's stats")
+	if len(stats.Writers) != 0 || stats.Totals.Calls != 0 {
+		t.Fatalf("another account sees our stats: %+v", stats)
+	}
 	other.want(other.do("GET", "/api/chapters/"+ch.Id.String()+"/history", nil, nil), 404, "GET", "other's history")
 	other.want(other.do("GET", "/api/runs/"+critiqueRun.Id.String()+"/calls", nil, nil), 404, "GET", "other's calls")
 

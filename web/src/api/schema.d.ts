@@ -652,6 +652,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/writers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Acceptance rates and cost per writer, by period and project
+         * @description For every writer of the account: issues on the editor-in-chief's list
+         *     that cite the writer (an issue counts for every critic it cites) with
+         *     the author's decisions and the resulting acceptance rate, drafts and
+         *     how many went into the chapter, and cost, tokens and calls per kind
+         *     of run. `period` restricts to the last 7, 30 or 90 days; `project_id`
+         *     to one novel (writer tests belong to no project and drop out then).
+         */
+        get: operations["getWriterStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{runId}": {
         parameters: {
             query?: never;
@@ -1428,6 +1453,74 @@ export interface components {
             error: string;
             /** Format: date-time */
             created_at: string;
+        };
+        KindCost: {
+            /** @description A run kind */
+            kind: string;
+            calls: number;
+            /** Format: double */
+            cost_usd: number;
+            cost_estimated: boolean;
+            /** Format: int64 */
+            prompt_tokens: number;
+            /** Format: int64 */
+            completion_tokens: number;
+        };
+        IssueStats: {
+            /** @description Issues on the editor-in-chief's list that cite this writer */
+            listed: number;
+            accepted: number;
+            rejected: number;
+            pending: number;
+            /**
+             * Format: double
+             * @description accepted / (accepted + rejected); absent until something was decided
+             */
+            acceptance_rate?: number;
+        };
+        DraftStats: {
+            /** @description Drafts the writer finished */
+            count: number;
+            /** @description Inserted or replaced */
+            used: number;
+            discarded: number;
+            pending: number;
+            /**
+             * Format: double
+             * @description used / (used + discarded); absent until something was decided
+             */
+            acceptance_rate?: number;
+        };
+        WriterStats: {
+            /** Format: uuid */
+            writer_id: string;
+            name: string;
+            slug: string;
+            model_alias: string;
+            enabled: boolean;
+            is_system: boolean;
+            roles: components["schemas"]["WriterRole"][];
+            /** @description Critiques the writer finished */
+            critiques: number;
+            issues: components["schemas"]["IssueStats"];
+            drafts: components["schemas"]["DraftStats"];
+            calls: number;
+            /** Format: double */
+            cost_usd: number;
+            cost_estimated: boolean;
+            /** Format: int64 */
+            prompt_tokens: number;
+            /** Format: int64 */
+            completion_tokens: number;
+            by_kind: components["schemas"]["KindCost"][];
+        };
+        WriterStatsPage: {
+            period: string;
+            /** Format: uuid */
+            project_id?: string;
+            writers: components["schemas"]["WriterStats"][];
+            /** @description Everything in the period and project */
+            totals: components["schemas"]["KindCost"];
         };
     };
     responses: {
@@ -2519,6 +2612,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelCall"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getWriterStats: {
+        parameters: {
+            query?: {
+                period?: "7d" | "30d" | "90d" | "all";
+                project_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WriterStatsPage"];
                 };
             };
             default: components["responses"]["Error"];

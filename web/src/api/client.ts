@@ -51,6 +51,9 @@ export type HistoryPage = Schemas["HistoryPage"];
 export type RunHistoryItem = Schemas["RunHistoryItem"];
 export type HistoryTotals = Schemas["HistoryTotals"];
 export type ModelCall = Schemas["ModelCall"];
+export type WriterStatsPage = Schemas["WriterStatsPage"];
+export type WriterStats = Schemas["WriterStats"];
+export type KindCost = Schemas["KindCost"];
 
 /** ApiError carries the server's stable error code alongside the message. */
 export class ApiError extends Error {

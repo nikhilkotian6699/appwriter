@@ -437,6 +437,30 @@ func (e WriterRole) Valid() bool {
 	}
 }
 
+// Defines values for GetWriterStatsParamsPeriod.
+const (
+	All  GetWriterStatsParamsPeriod = "all"
+	N30d GetWriterStatsParamsPeriod = "30d"
+	N7d  GetWriterStatsParamsPeriod = "7d"
+	N90d GetWriterStatsParamsPeriod = "90d"
+)
+
+// Valid indicates whether the value is a known member of the GetWriterStatsParamsPeriod enum.
+func (e GetWriterStatsParamsPeriod) Valid() bool {
+	switch e {
+	case All:
+		return true
+	case N30d:
+		return true
+	case N7d:
+		return true
+	case N90d:
+		return true
+	default:
+		return false
+	}
+}
+
 // BibleConflict defines model for BibleConflict.
 type BibleConflict struct {
 	ConflictsWith string `json:"conflicts_with"`
@@ -752,6 +776,20 @@ type DraftDecisionInput struct {
 // DraftMode defines model for DraftMode.
 type DraftMode string
 
+// DraftStats defines model for DraftStats.
+type DraftStats struct {
+	// AcceptanceRate used / (used + discarded); absent until something was decided
+	AcceptanceRate *float64 `json:"acceptance_rate,omitempty"`
+
+	// Count Drafts the writer finished
+	Count     int `json:"count"`
+	Discarded int `json:"discarded"`
+	Pending   int `json:"pending"`
+
+	// Used Inserted or replaced
+	Used int `json:"used"`
+}
+
 // DraftStatus defines model for DraftStatus.
 type DraftStatus string
 
@@ -860,6 +898,30 @@ type IssueSource struct {
 	WriterId   openapi_types.UUID `json:"writer_id"`
 	WriterName string             `json:"writer_name"`
 	WriterSlug string             `json:"writer_slug"`
+}
+
+// IssueStats defines model for IssueStats.
+type IssueStats struct {
+	// AcceptanceRate accepted / (accepted + rejected); absent until something was decided
+	AcceptanceRate *float64 `json:"acceptance_rate,omitempty"`
+	Accepted       int      `json:"accepted"`
+
+	// Listed Issues on the editor-in-chief's list that cite this writer
+	Listed   int `json:"listed"`
+	Pending  int `json:"pending"`
+	Rejected int `json:"rejected"`
+}
+
+// KindCost defines model for KindCost.
+type KindCost struct {
+	Calls            int     `json:"calls"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	CostEstimated    bool    `json:"cost_estimated"`
+	CostUsd          float64 `json:"cost_usd"`
+
+	// Kind A run kind
+	Kind         string `json:"kind"`
+	PromptTokens int64  `json:"prompt_tokens"`
 }
 
 // Me defines model for Me.
@@ -1095,6 +1157,36 @@ type WriterInput struct {
 // WriterRole defines model for WriterRole.
 type WriterRole string
 
+// WriterStats defines model for WriterStats.
+type WriterStats struct {
+	ByKind           []KindCost `json:"by_kind"`
+	Calls            int        `json:"calls"`
+	CompletionTokens int64      `json:"completion_tokens"`
+	CostEstimated    bool       `json:"cost_estimated"`
+	CostUsd          float64    `json:"cost_usd"`
+
+	// Critiques Critiques the writer finished
+	Critiques    int                `json:"critiques"`
+	Drafts       DraftStats         `json:"drafts"`
+	Enabled      bool               `json:"enabled"`
+	IsSystem     bool               `json:"is_system"`
+	Issues       IssueStats         `json:"issues"`
+	ModelAlias   string             `json:"model_alias"`
+	Name         string             `json:"name"`
+	PromptTokens int64              `json:"prompt_tokens"`
+	Roles        []WriterRole       `json:"roles"`
+	Slug         string             `json:"slug"`
+	WriterId     openapi_types.UUID `json:"writer_id"`
+}
+
+// WriterStatsPage defines model for WriterStatsPage.
+type WriterStatsPage struct {
+	Period    string              `json:"period"`
+	ProjectId *openapi_types.UUID `json:"project_id,omitempty"`
+	Totals    KindCost            `json:"totals"`
+	Writers   []WriterStats       `json:"writers"`
+}
+
 // WriterTestInput defines model for WriterTestInput.
 type WriterTestInput struct {
 	ModelAlias   string              `json:"model_alias"`
@@ -1186,6 +1278,15 @@ type ListProjectBibleProposalsParams struct {
 type StreamRunEventsParams struct {
 	After *int `form:"after,omitempty" json:"after,omitempty"`
 }
+
+// GetWriterStatsParams defines parameters for GetWriterStats.
+type GetWriterStatsParams struct {
+	Period    *GetWriterStatsParamsPeriod `form:"period,omitempty" json:"period,omitempty"`
+	ProjectId *openapi_types.UUID         `form:"project_id,omitempty" json:"project_id,omitempty"`
+}
+
+// GetWriterStatsParamsPeriod defines parameters for GetWriterStats.
+type GetWriterStatsParamsPeriod string
 
 // UpdateBibleEntryJSONRequestBody defines body for UpdateBibleEntry for application/json ContentType.
 type UpdateBibleEntryJSONRequestBody = BibleEntryInput
@@ -1387,6 +1488,9 @@ type ServerInterface interface {
 
 	// (PUT /api/settings)
 	UpdateSettings(w http.ResponseWriter, r *http.Request)
+	// GetWriterStats Acceptance rates and cost per writer, by period and project
+	// (GET /api/stats/writers)
+	GetWriterStats(w http.ResponseWriter, r *http.Request, params GetWriterStatsParams)
 
 	// (GET /api/writers)
 	ListWriters(w http.ResponseWriter, r *http.Request)
@@ -1668,6 +1772,12 @@ func (_ Unimplemented) GetSettings(w http.ResponseWriter, r *http.Request) {
 
 // (PUT /api/settings)
 func (_ Unimplemented) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetWriterStats Acceptance rates and cost per writer, by period and project
+// (GET /api/stats/writers)
+func (_ Unimplemented) GetWriterStats(w http.ResponseWriter, r *http.Request, params GetWriterStatsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3019,6 +3129,52 @@ func (siw *ServerInterfaceWrapper) UpdateSettings(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetWriterStats operation middleware
+func (siw *ServerInterfaceWrapper) GetWriterStats(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetWriterStatsParams
+
+	// ------------- Optional query parameter "period" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "period", r.URL.Query(), &params.Period, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "period"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "project_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "project_id", r.URL.Query(), &params.ProjectId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "project_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWriterStats(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListWriters operation middleware
 func (siw *ServerInterfaceWrapper) ListWriters(w http.ResponseWriter, r *http.Request) {
 
@@ -3406,6 +3562,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}/calls", wrapper.ListRunCalls)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/stats/writers", wrapper.GetWriterStats)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}", wrapper.GetRun)

@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M6 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-03 (M6 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -18,8 +18,8 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 3 | Editor-in-chief synthesis, issue list, accept/reject | Built on 2 feature branches, awaiting merge | see branches |
 | 4 | Revision with diff and hunks, bible-keeper proposals | Built on 3 feature branches, awaiting merge | see branches |
 | 5 | Co-writing workflow and compare mode | Built on 2 feature branches, awaiting merge | see branches |
-| 6 | Run history, cost and writer stats, settings page | In progress (run-history pushed; writer-stats next) | |
-| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Not started | |
+| 6 | Run history, cost and writer stats, settings page | Built on 2 feature branches, awaiting merge | see branches |
+| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Next | |
 | 8 | Account management: usage per user, roles, passwords, disable, delete | Not started | |
 | 9 | In-app guide for new users | Not started | |
 
@@ -47,7 +47,7 @@ branch is merged.
 | 5 | `feature/cowrite` | run-engine | Pushed (awaiting merge) |
 | 5 | `feature/compare-mode` | cowrite | Pushed (awaiting merge) |
 | 6 | `feature/run-history` | — | Pushed (awaiting merge) |
-| 6 | `feature/writer-stats` | — | Not started |
+| 6 | `feature/writer-stats` | — | Pushed (awaiting merge) |
 | 7 | `feature/auth-lib` | — | Not started |
 | 7 | `feature/login` | auth-lib | Not started |
 | 7 | `feature/users-and-account-pages` | login | Not started |
@@ -174,7 +174,16 @@ when work started):
   filter chips, expandable call tables and "Load older runs"; the chapter's
   snapshot panel is now called Versions; integration coverage in the critique
   and co-write tests.
-- Next: `feature/writer-stats`.
+- `feature/writer-stats` is done and pushed: GET /api/stats/writers (issues
+  cited per writer with decisions and acceptance rate, drafts and their use,
+  cost/tokens/calls per kind; period 7d/30d/90d/all; project filter), Stats
+  page with period, project and sort controls and a nav link; unit and
+  integration coverage. The Settings page (scene token limit, autosave
+  interval) exists since M1.
+
+Milestone 6 is complete pending merge (order: run-history, writer-stats) and
+the live gateway check. Next: Milestone 7 on `feature/auth-lib`, then
+`feature/login`, `feature/users-and-account-pages`, `feature/isolation-test`.
 
 ## Open items
 
