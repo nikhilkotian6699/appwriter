@@ -11,13 +11,7 @@ import (
 
 // GetMe returns the current account and the alias configuration.
 func (s *Server) GetMe(w http.ResponseWriter, r *http.Request) {
-	u := currentUser(r.Context())
-	writeJSON(w, http.StatusOK, Me{
-		User:              toUser(u),
-		AppName:           s.cfg.AppName,
-		DefaultModelAlias: s.cfg.DefaultModelAlias,
-		AliasPrefix:       s.cfg.AliasPrefix(),
-	})
+	writeJSON(w, http.StatusOK, s.me(currentUser(r.Context())))
 }
 
 // GetSettings returns the account's settings, creating defaults on first use.

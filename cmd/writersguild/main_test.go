@@ -49,6 +49,23 @@ func TestIntegrationBootstrap(t *testing.T) {
 	if err := bootstrap(ctx, q, config.Config{AppName: "writersguild"}, log); err != nil {
 		t.Fatalf("second bootstrap: %v", err)
 	}
+	// an installation whose only user predates accounts: that user becomes the
+	// admin. Other packages' tests may be creating users at the same moment,
+	// in which case this part cannot be judged and is skipped.
+	if err := q.SetUserRole(ctx, sqlcgen.SetUserRoleParams{ID: u.ID, Role: "author"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := bootstrap(ctx, q, config.Config{AppName: "writersguild"}, log); err != nil {
+		t.Fatalf("promoting bootstrap: %v", err)
+	}
+	if n, _ := q.CountUsers(ctx); n == 1 {
+		if promoted, _ := q.GetUserByID(ctx, u.ID); promoted.Role != "admin" {
+			t.Fatalf("the only user should have become the admin, role %q", promoted.Role)
+		}
+	} else {
+		t.Logf("skipping the promotion check: %d users exist while other tests run", n)
+		_ = q.SetUserRole(ctx, sqlcgen.SetUserRoleParams{ID: u.ID, Role: "admin"})
+	}
 	// reset flag: new password, sessions invalidated
 	cfg.AppPassword = "another password"
 	if err := resetAdminPassword(ctx, q, cfg, log); err != nil {

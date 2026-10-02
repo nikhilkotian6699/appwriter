@@ -924,6 +924,12 @@ type KindCost struct {
 	PromptTokens int64  `json:"prompt_tokens"`
 }
 
+// LoginInput defines model for LoginInput.
+type LoginInput struct {
+	Password string `json:"password"`
+	Username string `json:"username"`
+}
+
 // Me defines model for Me.
 type Me struct {
 	AliasPrefix       string `json:"alias_prefix"`
@@ -1288,6 +1294,9 @@ type GetWriterStatsParams struct {
 // GetWriterStatsParamsPeriod defines parameters for GetWriterStats.
 type GetWriterStatsParamsPeriod string
 
+// LoginJSONRequestBody defines body for Login for application/json ContentType.
+type LoginJSONRequestBody = LoginInput
+
 // UpdateBibleEntryJSONRequestBody defines body for UpdateBibleEntry for application/json ContentType.
 type UpdateBibleEntryJSONRequestBody = BibleEntryInput
 
@@ -1350,6 +1359,12 @@ type UpdateWriterJSONRequestBody = WriterInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Login Sign in with username and password
+	// (POST /api/auth/login)
+	Login(w http.ResponseWriter, r *http.Request)
+	// Logout Sign out of this browser
+	// (POST /api/auth/logout)
+	Logout(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /api/bible-entries/{entryId})
 	DeleteBibleEntry(w http.ResponseWriter, r *http.Request, entryId EntryId)
@@ -1517,6 +1532,18 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// Login Sign in with username and password
+// (POST /api/auth/login)
+func (_ Unimplemented) Login(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Logout Sign out of this browser
+// (POST /api/auth/logout)
+func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // (DELETE /api/bible-entries/{entryId})
 func (_ Unimplemented) DeleteBibleEntry(w http.ResponseWriter, r *http.Request, entryId EntryId) {
@@ -1825,6 +1852,34 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// Login operation middleware
+func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Login(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Logout operation middleware
+func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Logout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // DeleteBibleEntry operation middleware
 func (siw *ServerInterfaceWrapper) DeleteBibleEntry(w http.ResponseWriter, r *http.Request) {
@@ -3434,6 +3489,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/auth/login", wrapper.Login)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/auth/logout", wrapper.Logout)
+	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/me", wrapper.GetMe)
 	})

@@ -1,12 +1,44 @@
+import { useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { useMe } from "../api/hooks";
-import { ErrorBanner } from "./ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, ApiError, call } from "../api/client";
+import { keys, useMe } from "../api/hooks";
+import { LoginPage } from "../pages/LoginPage";
+import { Button, ErrorBanner, Spinner } from "./ui";
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-md px-3 py-1.5 text-sm font-medium ${isActive ? "bg-stone-900 text-white" : "text-stone-700 hover:bg-stone-200"}`;
 
 export function Layout() {
   const me = useMe();
+  const qc = useQueryClient();
+  // Any request answered "sign in to continue" sends the app back to the login page.
+  useEffect(() => {
+    const onUnauthorized = () => {
+      qc.setQueryData(keys.me, undefined);
+      qc.invalidateQueries({ queryKey: keys.me });
+    };
+    window.addEventListener("wg:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("wg:unauthorized", onUnauthorized);
+  }, [qc]);
+  const logout = useMutation({
+    mutationFn: () => call(api.POST("/api/auth/logout")),
+    onSettled: () => {
+      qc.clear();
+      qc.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+
+  if (me.isLoading) {
+    return (
+      <div className="flex min-h-full items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+  if (me.isError && me.error instanceof ApiError && me.error.status === 401) {
+    return <LoginPage />;
+  }
   return (
     <div className="flex min-h-full flex-col">
       <header className="border-b border-stone-200 bg-white">
@@ -40,6 +72,9 @@ export function Layout() {
                 {me.data.user.display_name || me.data.user.username}
               </span>
             )}
+            <Button size="sm" variant="ghost" onClick={() => logout.mutate()} loading={logout.isPending} title="Sign out of this browser">
+              Sign out
+            </Button>
           </div>
         </div>
       </header>

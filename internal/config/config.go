@@ -23,6 +23,8 @@ type Config struct {
 	LLMTimeout        time.Duration
 	RunTimeout        time.Duration
 	SessionSecret     string
+	SessionMaxAge     time.Duration
+	CookieSecure      bool
 }
 
 // Load reads the environment. It returns an error for anything the server
@@ -40,6 +42,8 @@ func Load() (Config, error) {
 		LLMTimeout:        time.Duration(envInt("LLM_TIMEOUT_SECONDS", 120)) * time.Second,
 		RunTimeout:        time.Duration(envInt("RUN_TIMEOUT_SECONDS", 900)) * time.Second,
 		SessionSecret:     os.Getenv("SESSION_SECRET"),
+		SessionMaxAge:     time.Duration(envInt("SESSION_MAX_AGE_DAYS", 30)) * 24 * time.Hour,
+		CookieSecure:      envBool("COOKIE_SECURE", false),
 	}
 	var errs []error
 	if cfg.DatabaseURL == "" {
@@ -50,6 +54,9 @@ func Load() (Config, error) {
 	}
 	if cfg.AppName == "" {
 		errs = append(errs, errors.New("APP_NAME must not be empty"))
+	}
+	if cfg.SessionSecret != "" && len(cfg.SessionSecret) < 32 {
+		errs = append(errs, errors.New("SESSION_SECRET must be at least 32 characters"))
 	}
 	if len(errs) > 0 {
 		return cfg, errors.Join(errs...)
@@ -78,4 +85,18 @@ func envInt(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+func envBool(key string, def bool) bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	switch v {
+	case "":
+		return def
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "config: %s=%q is not a boolean, using %v\n", key, v, def)
+	return def
 }

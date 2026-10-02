@@ -4,6 +4,49 @@
  */
 
 export interface paths {
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in with username and password
+         * @description Sets the session cookie (HttpOnly, SameSite=Lax; Secure over HTTPS)
+         *     and returns the account. A wrong username is refused exactly like a
+         *     wrong password (401, code `invalid_credentials`). After five wrong
+         *     passwords for a username from one address, further tries are refused
+         *     with 429 (code `too_many_attempts`) and a `Retry-After` header for a
+         *     minute, then longer, up to a quarter of an hour. A disabled account
+         *     cannot sign in (401, code `account_disabled`).
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign out of this browser */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me": {
         parameters: {
             query?: never;
@@ -1522,6 +1565,10 @@ export interface components {
             /** @description Everything in the period and project */
             totals: components["schemas"]["KindCost"];
         };
+        LoginInput: {
+            username: string;
+            password: string;
+        };
     };
     responses: {
         /** @description Error */
@@ -1552,6 +1599,50 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginInput"];
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session cookie was cleared */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
     getMe: {
         parameters: {
             query?: never;

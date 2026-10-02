@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { api, call } from "./client";
+import { api, ApiError, call } from "./client";
 
 export const keys = {
   me: ["me"] as const,
@@ -28,7 +28,12 @@ export const keys = {
 };
 
 export function useMe() {
-  return useQuery({ queryKey: keys.me, queryFn: () => call(api.GET("/api/me")), staleTime: 60_000 });
+  return useQuery({
+    queryKey: keys.me,
+    queryFn: () => call(api.GET("/api/me")),
+    staleTime: 60_000,
+    retry: (count, err) => !(err instanceof ApiError && err.status === 401) && count < 1,
+  });
 }
 
 export function useSettings() {

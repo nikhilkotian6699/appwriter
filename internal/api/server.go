@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -14,12 +15,21 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"writersguild/internal/auth"
 	"writersguild/internal/config"
 	"writersguild/internal/db/sqlcgen"
 	"writersguild/internal/guild"
 	"writersguild/internal/llm"
 	"writersguild/internal/runs"
 )
+
+// Auth bundles what signing in needs.
+type Auth struct {
+	Signer       *auth.Signer
+	Limiter      *auth.Limiter
+	MaxAge       time.Duration
+	CookieSecure bool
+}
 
 // Server implements the generated ServerInterface.
 type Server struct {
@@ -29,25 +39,58 @@ type Server struct {
 	llm    llm.Client
 	guild  *guild.Guild
 	engine *runs.Engine
+	auth   Auth
 	log    *slog.Logger
-	// resolveUser returns the account making the request. Until milestone 7
-	// this is the single bootstrap account.
+	// resolveUser returns the account making the request: the session
+	// cookie's account, or whatever a test pinned through SetUserResolver.
 	resolveUser func(r *http.Request) (sqlcgen.User, error)
 }
 
 var _ ServerInterface = (*Server)(nil)
 
 // NewServer wires a Server.
-func NewServer(cfg config.Config, pool *pgxpool.Pool, q *sqlcgen.Queries, client llm.Client, g *guild.Guild, engine *runs.Engine, log *slog.Logger) *Server {
-	s := &Server{cfg: cfg, pool: pool, q: q, llm: client, guild: g, engine: engine, log: log}
-	s.resolveUser = s.singleUser
+func NewServer(cfg config.Config, pool *pgxpool.Pool, q *sqlcgen.Queries, client llm.Client, g *guild.Guild, engine *runs.Engine, a Auth, log *slog.Logger) *Server {
+	s := &Server{cfg: cfg, pool: pool, q: q, llm: client, guild: g, engine: engine, auth: a, log: log}
+	if s.auth.Limiter == nil {
+		s.auth.Limiter = auth.NewLimiter()
+	}
+	if s.auth.MaxAge <= 0 {
+		s.auth.MaxAge = 30 * 24 * time.Hour
+	}
+	s.resolveUser = s.sessionUser
 	return s
 }
 
-// singleUser resolves the first (only) account.
-func (s *Server) singleUser(r *http.Request) (sqlcgen.User, error) {
-	return s.q.GetFirstUser(r.Context())
+// errNoSession means the request carries no usable session cookie.
+var errNoSession = errors.New("not signed in")
+
+// sessionUser resolves the account from the session cookie. The cookie
+// must verify, be young enough, and name an account whose auth version has
+// not moved on (a password change or a disable bumps it).
+func (s *Server) sessionUser(r *http.Request) (sqlcgen.User, error) {
+	if s.auth.Signer == nil {
+		return sqlcgen.User{}, errNoSession
+	}
+	c, err := r.Cookie(sessionCookie)
+	if err != nil || c.Value == "" {
+		return sqlcgen.User{}, errNoSession
+	}
+	sess, err := s.auth.Signer.Decode(c.Value, time.Now(), s.auth.MaxAge)
+	if err != nil {
+		return sqlcgen.User{}, errNoSession
+	}
+	u, err := s.q.GetUserByID(r.Context(), sess.UserID)
+	if err != nil {
+		return sqlcgen.User{}, errNoSession
+	}
+	if u.AuthVersion != sess.AuthVersion {
+		return sqlcgen.User{}, errNoSession
+	}
+	return u, nil
 }
+
+// publicPaths need no account.
+var publicPaths = map[string]bool{"/api/auth/login": true, "/api/auth/logout": true}
 
 type ctxKey int
 
@@ -56,9 +99,13 @@ const userKey ctxKey = 1
 // withUser puts the current account into the request context.
 func (s *Server) withUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if publicPaths[r.URL.Path] {
+			next.ServeHTTP(w, r)
+			return
+		}
 		u, err := s.resolveUser(r)
 		if err != nil {
-			writeError(w, http.StatusUnauthorized, "unauthorized", "no account is signed in")
+			writeError(w, http.StatusUnauthorized, "unauthorized", "sign in to continue")
 			return
 		}
 		if u.DisabledAt != nil {

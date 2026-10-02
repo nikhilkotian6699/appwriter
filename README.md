@@ -54,6 +54,9 @@ database; changing the variable does nothing until you run the reset flag
 | `APP_NAME` | yes (default `writersguild`) | Prefix of the alias convention and the first Langfuse tag. |
 | `DEFAULT_MODEL_ALIAS` | no | When set, every seeded writer of a new account uses this alias, so the app works on a gateway with no per-writer aliases. |
 | `APP_USERNAME`, `APP_PASSWORD` | first start | Username (lower-case, 3 to 32 characters) and password (8 or more characters) of the first admin. |
+| `SESSION_SECRET` | recommended | Signs the login cookie; 32 or more random characters. Without it a one-process secret is made at start and every restart signs everyone out. |
+| `SESSION_MAX_AGE_DAYS` | no (30) | How long a login lasts. |
+| `COOKIE_SECURE` | no (auto) | Force the Secure flag on the cookie; it is set automatically over HTTPS (also behind a proxy sending `X-Forwarded-Proto`). |
 | `POSTGRES_PASSWORD` | yes (compose) | Password of the `writersguild` database role. Compose derives `DATABASE_URL` from it. |
 | `DATABASE_URL` | outside compose | Full connection string when running the binary yourself. |
 | `PORT` | no (8080) | HTTP port. |
@@ -97,17 +100,25 @@ passages from published work, always follow the required output format.
 
 ## Accounts
 
-- The first account comes from `APP_USERNAME` / `APP_PASSWORD` at first start.
-- Lost the admin password? Set `APP_PASSWORD` and run the binary once with the
-  reset flag, then start normally:
+Every account is a workspace of its own: projects, chapters, story bibles,
+writers, runs, settings and stats belong to it and nobody else sees them, the
+admin included. There is no sharing.
 
-  ```bash
-  docker compose run --rm app -reset-admin-password
-  ```
+Sign in with username and password (`POST /api/auth/login`). The session is a
+signed, HttpOnly cookie (`wg_session`) that stops working when the account is
+disabled or its password changes, because it carries the account's auth
+version and the server compares it on every request. A wrong username is
+refused exactly like a wrong password. After five wrong passwords for a
+username from one address, further tries wait a minute, then twice as long
+each time, up to a quarter of an hour (429 with `Retry-After`).
 
-- Login, further accounts and the Users page arrive in milestone 7 of the
-  brief. Until then the app runs as a single workspace, and every table is
-  already scoped by account so that milestone is additive.
+The first account is created at the first start from `APP_USERNAME` and
+`APP_PASSWORD`, as an admin; after that the password lives in the database.
+`writersguild -reset-admin-password` sets it again from the environment for a
+lost password (and signs that account out everywhere). An installation that
+had a single user before accounts arrived keeps everything: that user is the
+admin. Roles are admin and author; only an admin adds accounts, on the Users
+page, and there is no sign-up form.
 
 ## Development
 

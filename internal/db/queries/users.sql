@@ -21,3 +21,6 @@ WHERE id = $1;
 
 -- name: DeleteUser :exec
 DELETE FROM users WHERE id = $1;
+
+-- name: SetUserRole :exec
+UPDATE users SET role = $2, updated_at = now() WHERE id = $1;

@@ -19,7 +19,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 4 | Revision with diff and hunks, bible-keeper proposals | Built on 3 feature branches, awaiting merge | see branches |
 | 5 | Co-writing workflow and compare mode | Built on 2 feature branches, awaiting merge | see branches |
 | 6 | Run history, cost and writer stats, settings page | Built on 2 feature branches, awaiting merge | see branches |
-| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | In progress (auth-lib pushed) | |
+| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | In progress (auth-lib, login pushed) | |
 | 8 | Account management: usage per user, roles, passwords, disable, delete | Not started | |
 | 9 | In-app guide for new users | Not started | |
 
@@ -49,7 +49,7 @@ branch is merged.
 | 6 | `feature/run-history` | — | Pushed (awaiting merge) |
 | 6 | `feature/writer-stats` | — | Pushed (awaiting merge) |
 | 7 | `feature/auth-lib` | — | Pushed (awaiting merge) |
-| 7 | `feature/login` | auth-lib | Not started |
+| 7 | `feature/login` | auth-lib | Pushed (awaiting merge) |
 | 7 | `feature/users-and-account-pages` | login | Not started |
 | 7 | `feature/isolation-test` | login | Not started |
 | 8 | `feature/account-usage` | users-and-account-pages | Not started |
@@ -194,7 +194,17 @@ when work started):
   then 1, 2, 4, 8 and 15 minutes; reset on success; idle buckets swept);
   unit tests for both. Passwords (bcrypt, rules, dummy hash) were already in
   the package since M1.
-- Next: `feature/login`.
+- `feature/login` is done and pushed: cookie sessions replace the
+  single-account middleware (`wg_session`, HttpOnly, SameSite=Lax, Secure
+  over HTTPS; auth version checked on every request), POST /api/auth/login
+  (same refusal for wrong username and password, limiter with Retry-After,
+  disabled accounts refused), POST /api/auth/logout, SESSION_SECRET /
+  SESSION_MAX_AGE_DAYS / COOKIE_SECURE (random one-process secret with a
+  warning when unset), bootstrap promotes a lone pre-existing user to admin,
+  login page with lockout message and Guide link, Sign out button, any 401
+  returns the app to the login page; integration tests for sessions and
+  lockouts.
+- Next: `feature/users-and-account-pages`.
 
 ## Open items
 

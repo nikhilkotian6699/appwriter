@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -72,11 +74,20 @@ func run(log *slog.Logger, resetAdmin, healthcheck bool) error {
 		log.Warn("marked runs left over from a previous start as failed", "count", n)
 	}
 
+	secret := cfg.SessionSecret
+	if secret == "" {
+		secret = randomSecret()
+		log.Warn("SESSION_SECRET is not set; sessions will not survive a restart. Set it in .env (32+ random characters).")
+	}
+	signer, err := auth.NewSigner(secret)
+	if err != nil {
+		return err
+	}
 	client := llm.NewLiteLLM(cfg.LiteLLMBaseURL, cfg.LiteLLMAPIKey)
 	tracker := runs.NewTracker(q, client, cfg.AppName)
 	engine := runs.NewEngine(tracker, q, cfg.RunTimeout, log)
 	g := guildpkg.New(engine, q, cfg.AppName, cfg.LLMTimeout)
-	server := api.NewServer(cfg, pool, q, client, g, engine, log)
+	server := api.NewServer(cfg, pool, q, client, g, engine, api.Auth{Signer: signer, Limiter: auth.NewLimiter(), MaxAge: cfg.SessionMaxAge, CookieSecure: cfg.CookieSecure}, log)
 
 	webFS, err := fs.Sub(web.Dist, "dist")
 	if err != nil {
@@ -116,11 +127,24 @@ func run(log *slog.Logger, resetAdmin, healthcheck bool) error {
 }
 
 // bootstrap creates the first account from the environment when the users
-// table is empty, and seeds its writers.
+// table is empty, and seeds its writers. An installation that had a single
+// user before accounts arrived keeps everything: that user becomes the admin.
 func bootstrap(ctx context.Context, q *sqlcgen.Queries, cfg config.Config, log *slog.Logger) error {
 	n, err := q.CountUsers(ctx)
 	if err != nil {
 		return fmt.Errorf("count users: %w", err)
+	}
+	if n == 1 {
+		only, err := q.GetFirstUser(ctx)
+		if err != nil {
+			return fmt.Errorf("load the only user: %w", err)
+		}
+		if only.Role != "admin" {
+			if err := q.SetUserRole(ctx, sqlcgen.SetUserRoleParams{ID: only.ID, Role: "admin"}); err != nil {
+				return fmt.Errorf("promote the only user: %w", err)
+			}
+			log.Info("the only existing account is now the admin", "username", only.Username)
+		}
 	}
 	if n > 0 {
 		return nil
@@ -188,4 +212,14 @@ func probe() error {
 		return fmt.Errorf("health status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// randomSecret makes a one-process session secret for installations that
+// set none.
+func randomSecret() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(b)
 }

@@ -3,6 +3,7 @@ import type { components, paths } from "./schema";
 
 export type Schemas = components["schemas"];
 export type Me = Schemas["Me"];
+export type LoginInput = Schemas["LoginInput"];
 export type Project = Schemas["Project"];
 export type ProjectSummary = Schemas["ProjectSummary"];
 export type ProjectInput = Schemas["ProjectInput"];
@@ -81,11 +82,12 @@ export async function call<T>(p: Promise<Result<T>>): Promise<T> {
   }
   if (!res.response.ok) {
     const err = res.error as Schemas["ErrorResponse"] | undefined;
-    throw new ApiError(
-      res.response.status,
-      err?.error?.code ?? "error",
-      err?.error?.message ?? `${res.response.status} ${res.response.statusText}`,
-    );
+    const code = err?.error?.code ?? "error";
+    if (res.response.status === 401 && code === "unauthorized") {
+      // The session ended (signed out elsewhere, password changed, account disabled): show the login page.
+      window.dispatchEvent(new CustomEvent("wg:unauthorized"));
+    }
+    throw new ApiError(res.response.status, code, err?.error?.message ?? `${res.response.status} ${res.response.statusText}`);
   }
   return res.data as T;
 }

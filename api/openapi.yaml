@@ -10,6 +10,40 @@ servers:
   - url: /
 security: []
 paths:
+  /api/auth/login:
+    post:
+      operationId: login
+      summary: Sign in with username and password
+      description: |
+        Sets the session cookie (HttpOnly, SameSite=Lax; Secure over HTTPS)
+        and returns the account. A wrong username is refused exactly like a
+        wrong password (401, code `invalid_credentials`). After five wrong
+        passwords for a username from one address, further tries are refused
+        with 429 (code `too_many_attempts`) and a `Retry-After` header for a
+        minute, then longer, up to a quarter of an hour. A disabled account
+        cannot sign in (401, code `account_disabled`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginInput" }
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/auth/logout:
+    post:
+      operationId: logout
+      summary: Sign out of this browser
+      responses:
+        "204":
+          description: The session cookie was cleared
+        default: { $ref: "#/components/responses/Error" }
+
   /api/me:
     get:
       operationId: getMe
@@ -1800,3 +1834,10 @@ components:
           type: array
           items: { $ref: "#/components/schemas/WriterStats" }
         totals: { $ref: "#/components/schemas/KindCost", description: Everything in the period and project, including calls of writers since deleted }
+
+    LoginInput:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, maxLength: 64 }
+        password: { type: string, maxLength: 256 }

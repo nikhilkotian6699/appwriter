@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"writersguild/internal/auth"
 	"writersguild/internal/config"
 	"writersguild/internal/db/sqlcgen"
 	"writersguild/internal/guild"
@@ -46,7 +47,8 @@ func newEnv(t *testing.T) *env {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	engine := runs.NewEngine(tracker, q, 30*time.Second, logger)
 	g := guild.New(engine, q, cfg.AppName, cfg.LLMTimeout)
-	srv := NewServer(cfg, pool, q, mock, g, engine, logger)
+	signer, _ := auth.NewSigner("integration-test-secret-that-is-long-enough-0123456789")
+	srv := NewServer(cfg, pool, q, mock, g, engine, Auth{Signer: signer, Limiter: auth.NewLimiter(), MaxAge: time.Hour}, logger)
 	srv.SetUserResolver(func(r *http.Request) (sqlcgen.User, error) { return q.GetUserByID(r.Context(), user.ID) })
 	static := fstest.MapFS{"index.html": {Data: []byte("app")}}
 	return &env{t: t, q: q, mock: mock, server: srv, engine: engine, handler: NewRouter(srv, static, static), user: user}
