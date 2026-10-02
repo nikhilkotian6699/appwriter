@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M6 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-03 (M7 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -19,7 +19,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 4 | Revision with diff and hunks, bible-keeper proposals | Built on 3 feature branches, awaiting merge | see branches |
 | 5 | Co-writing workflow and compare mode | Built on 2 feature branches, awaiting merge | see branches |
 | 6 | Run history, cost and writer stats, settings page | Built on 2 feature branches, awaiting merge | see branches |
-| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Next | |
+| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | In progress (auth-lib pushed) | |
 | 8 | Account management: usage per user, roles, passwords, disable, delete | Not started | |
 | 9 | In-app guide for new users | Not started | |
 
@@ -48,7 +48,7 @@ branch is merged.
 | 5 | `feature/compare-mode` | cowrite | Pushed (awaiting merge) |
 | 6 | `feature/run-history` | — | Pushed (awaiting merge) |
 | 6 | `feature/writer-stats` | — | Pushed (awaiting merge) |
-| 7 | `feature/auth-lib` | — | Not started |
+| 7 | `feature/auth-lib` | — | Pushed (awaiting merge) |
 | 7 | `feature/login` | auth-lib | Not started |
 | 7 | `feature/users-and-account-pages` | login | Not started |
 | 7 | `feature/isolation-test` | login | Not started |
@@ -182,8 +182,19 @@ when work started):
   interval) exists since M1.
 
 Milestone 6 is complete pending merge (order: run-history, writer-stats) and
-the live gateway check. Next: Milestone 7 on `feature/auth-lib`, then
-`feature/login`, `feature/users-and-account-pages`, `feature/isolation-test`.
+the live gateway check.
+
+Milestone 7 (stacked on `feature/writer-stats`; origin still showed no merges
+when work started):
+
+- `feature/auth-lib` is done and pushed: `auth.Signer` (HMAC-SHA256 signed
+  session tokens carrying user id, auth version and issue time; max age;
+  tamper and future-dated tokens rejected; secret of at least 32 characters)
+  and `auth.Limiter` (five free wrong passwords per username and address,
+  then 1, 2, 4, 8 and 15 minutes; reset on success; idle buckets swept);
+  unit tests for both. Passwords (bcrypt, rules, dummy hash) were already in
+  the package since M1.
+- Next: `feature/login`.
 
 ## Open items
 
