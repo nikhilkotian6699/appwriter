@@ -11,6 +11,30 @@ import (
 	"github.com/google/uuid"
 )
 
+const cancelRunsByUser = `-- name: CancelRunsByUser :execrows
+UPDATE runs SET status = 'cancelled', error = 'the account was disabled', finished_at = now()
+WHERE user_id = $1 AND status IN ('queued', 'running')
+`
+
+func (q *Queries) CancelRunsByUser(ctx context.Context, userID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelRunsByUser, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const countActiveAdmins = `-- name: CountActiveAdmins :one
+SELECT count(*) FROM users WHERE role = 'admin' AND disabled_at IS NULL
+`
+
+func (q *Queries) CountActiveAdmins(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveAdmins)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countUsers = `-- name: CountUsers :one
 SELECT count(*) FROM users
 `
@@ -64,6 +88,48 @@ DELETE FROM users WHERE id = $1
 func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteUser, id)
 	return err
+}
+
+const disableUser = `-- name: DisableUser :one
+UPDATE users SET disabled_at = now(), auth_version = auth_version + 1, updated_at = now() WHERE id = $1 RETURNING id, username, display_name, password_hash, role, disabled_at, auth_version, created_at, updated_at
+`
+
+func (q *Queries) DisableUser(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, disableUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.Role,
+		&i.DisabledAt,
+		&i.AuthVersion,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const enableUser = `-- name: EnableUser :one
+UPDATE users SET disabled_at = NULL, updated_at = now() WHERE id = $1 RETURNING id, username, display_name, password_hash, role, disabled_at, auth_version, created_at, updated_at
+`
+
+func (q *Queries) EnableUser(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, enableUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.Role,
+		&i.DisabledAt,
+		&i.AuthVersion,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getFirstUser = `-- name: GetFirstUser :one
@@ -129,6 +195,51 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const getUserForUpdate = `-- name: GetUserForUpdate :one
+SELECT id, username, display_name, password_hash, role, disabled_at, auth_version, created_at, updated_at FROM users WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) GetUserForUpdate(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserForUpdate, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.Role,
+		&i.DisabledAt,
+		&i.AuthVersion,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listActiveRunIDsByUser = `-- name: ListActiveRunIDsByUser :many
+SELECT id FROM runs WHERE user_id = $1 AND status IN ('queued', 'running')
+`
+
+func (q *Queries) ListActiveRunIDsByUser(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listActiveRunIDsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsers = `-- name: ListUsers :many
 SELECT id, username, display_name, password_hash, role, disabled_at, auth_version, created_at, updated_at FROM users ORDER BY created_at, username
 `
@@ -163,6 +274,15 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 	return items, nil
 }
 
+const lockAccounts = `-- name: LockAccounts :exec
+SELECT pg_advisory_xact_lock(hashtext('writersguild-accounts'))
+`
+
+func (q *Queries) LockAccounts(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockAccounts)
+	return err
+}
+
 const setUserRole = `-- name: SetUserRole :exec
 UPDATE users SET role = $2, updated_at = now() WHERE id = $1
 `
@@ -175,6 +295,33 @@ type SetUserRoleParams struct {
 func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) error {
 	_, err := q.db.Exec(ctx, setUserRole, arg.ID, arg.Role)
 	return err
+}
+
+const updateUserByAdmin = `-- name: UpdateUserByAdmin :one
+UPDATE users SET display_name = $2, role = $3, updated_at = now() WHERE id = $1 RETURNING id, username, display_name, password_hash, role, disabled_at, auth_version, created_at, updated_at
+`
+
+type UpdateUserByAdminParams struct {
+	ID          uuid.UUID
+	DisplayName string
+	Role        string
+}
+
+func (q *Queries) UpdateUserByAdmin(ctx context.Context, arg UpdateUserByAdminParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserByAdmin, arg.ID, arg.DisplayName, arg.Role)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.PasswordHash,
+		&i.Role,
+		&i.DisabledAt,
+		&i.AuthVersion,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const updateUserDisplayName = `-- name: UpdateUserDisplayName :one

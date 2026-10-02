@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M8 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-03 (M8 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -20,8 +20,8 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 5 | Co-writing workflow and compare mode | Built on 2 feature branches, awaiting merge | see branches |
 | 6 | Run history, cost and writer stats, settings page | Built on 2 feature branches, awaiting merge | see branches |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Built on 4 feature branches, awaiting merge | see branches |
-| 8 | Account management: usage per user, roles, passwords, disable, delete | In progress (account-usage pushed) | |
-| 9 | In-app guide for new users | Not started | |
+| 8 | Account management: usage per user, roles, passwords, disable, delete | Built on 2 feature branches, awaiting merge | see branches |
+| 9 | In-app guide for new users | Next | |
 
 ## Feature branches
 
@@ -53,7 +53,7 @@ branch is merged.
 | 7 | `feature/users-and-account-pages` | login | Pushed (awaiting merge) |
 | 7 | `feature/isolation-test` | login | Pushed (awaiting merge) |
 | 8 | `feature/account-usage` | users-and-account-pages | Pushed (awaiting merge) |
-| 8 | `feature/account-management` | users-and-account-pages | Not started |
+| 8 | `feature/account-management` | users-and-account-pages | Pushed (awaiting merge) |
 | 9 | `feature/guide-screenshots` | everything else | Not started |
 
 Status values: Not started · In progress · Pushed (awaiting merge) · Merged.
@@ -230,7 +230,18 @@ the stack merged when work started):
   7d/30d/90d/all with totals), `disabled_at` on the User schema, the Users
   page shows the usage table with a period selector and totals; isolation
   probe and integration coverage.
-- Next: `feature/account-management`.
+- `feature/account-management` is done and pushed: PUT /api/users/{id}
+  (display name, role), PUT /api/users/{id}/password, POST .../disable
+  (signs out, cancels runs, keeps work), POST .../enable, DELETE
+  /api/users/{id} (disabled accounts only, username typed); nobody changes
+  their own role or access, one active admin always remains, all inside a
+  transaction holding an advisory lock (the concurrent-demotion test proves
+  exactly one of two simultaneous demotions goes through); Users page row
+  actions with dialogs; isolation probes and integration coverage.
+
+Milestone 8 is complete pending merge (order: account-usage,
+account-management) and the live gateway check. Next: Milestone 9 on
+`feature/guide-content` then `feature/guide-screenshots`.
 
 ## Open items
 

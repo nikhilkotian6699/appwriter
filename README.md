@@ -128,8 +128,18 @@ the browser that made it keeps a fresh session.
 
 Managing accounts (Users page, admins only): `GET /api/users/usage` shows
 what every account holds (projects, chapters) and used over the last 7, 30
-or 90 days or all time (runs, gateway calls, tokens, cost) with totals. The
-admin sees accounts and usage, never manuscripts.
+or 90 days or all time (runs, gateway calls, tokens, cost) with totals. Per
+account the admin can change the display name and the role
+(`PUT /api/users/{id}`), set a new password (`PUT /api/users/{id}/password`,
+which signs the account out everywhere), disable and enable it
+(`POST .../disable`, `POST .../enable`: disabling signs it out, cancels its
+runs and keeps its work), and delete a disabled account after typing its
+username (`DELETE /api/users/{id}`, which removes everything it owns). Two
+rules hold whatever is clicked or called: nobody changes their own role or
+access, and one active admin always remains; the checks run inside a
+transaction holding an advisory lock, so two admins acting at the same moment
+cannot both get through. The admin sees accounts and usage, never
+manuscripts.
 
 ### Isolation test
 

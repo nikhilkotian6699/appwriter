@@ -19,7 +19,7 @@ import (
 // isolationFixtures is everything account A owns that account B must never
 // reach.
 type isolationFixtures struct {
-	project, chapter, version, entry, writer, run, critique, issue, revision, draft, proposal uuid.UUID
+	user, project, chapter, version, entry, writer, run, critique, issue, revision, draft, proposal uuid.UUID
 }
 
 // makeFixtures gives account A one of everything, through the API where it
@@ -28,6 +28,7 @@ func makeFixtures(t *testing.T, a *env) isolationFixtures {
 	t.Helper()
 	ctx := context.Background()
 	var f isolationFixtures
+	f.user = a.user.ID
 	var p Project
 	a.want(a.do("POST", "/api/projects", ProjectInput{Name: "A's novel"}, &p), 201, "POST", "/api/projects")
 	f.project = p.Id
@@ -96,19 +97,24 @@ type probe struct {
 func isolationProbes(f isolationFixtures) map[string]probe {
 	id := func(u uuid.UUID) string { return u.String() }
 	return map[string]probe{
-		"GET /api/healthz":          {path: "/api/healthz", expect: "public"},
-		"POST /api/auth/login":      {path: "/api/auth/login", body: map[string]string{"username": "nobody", "password": "nothing"}, expect: "public"},
-		"POST /api/auth/logout":     {path: "/api/auth/logout", expect: "public"},
-		"GET /api/me":               {path: "/api/me", expect: "own"},
-		"GET /api/settings":         {path: "/api/settings", expect: "own"},
-		"PUT /api/settings":         {path: "/api/settings", body: SettingsInput{SceneTokenLimit: 6000, AutosaveSnapshotMinutes: 10}, expect: "own"},
-		"GET /api/gateway/models":   {path: "/api/gateway/models", expect: "own"},
-		"GET /api/stats/writers":    {path: "/api/stats/writers", expect: "own"},
-		"GET /api/users":            {path: "/api/users", expect: "403"},
-		"POST /api/users":           {path: "/api/users", body: UserCreateInput{Username: "intruder", Password: "first password 1", Role: "author"}, expect: "403"},
-		"GET /api/users/usage":      {path: "/api/users/usage", expect: "403"},
-		"PUT /api/account":          {path: "/api/account", body: AccountInput{DisplayName: "B"}, expect: "own"},
-		"PUT /api/account/password": {path: "/api/account/password", body: PasswordChangeInput{CurrentPassword: "x", NewPassword: "long enough 1"}, expect: "own"},
+		"GET /api/healthz":                 {path: "/api/healthz", expect: "public"},
+		"POST /api/auth/login":             {path: "/api/auth/login", body: map[string]string{"username": "nobody", "password": "nothing"}, expect: "public"},
+		"POST /api/auth/logout":            {path: "/api/auth/logout", expect: "public"},
+		"GET /api/me":                      {path: "/api/me", expect: "own"},
+		"GET /api/settings":                {path: "/api/settings", expect: "own"},
+		"PUT /api/settings":                {path: "/api/settings", body: SettingsInput{SceneTokenLimit: 6000, AutosaveSnapshotMinutes: 10}, expect: "own"},
+		"GET /api/gateway/models":          {path: "/api/gateway/models", expect: "own"},
+		"GET /api/stats/writers":           {path: "/api/stats/writers", expect: "own"},
+		"GET /api/users":                   {path: "/api/users", expect: "403"},
+		"POST /api/users":                  {path: "/api/users", body: UserCreateInput{Username: "intruder", Password: "first password 1", Role: "author"}, expect: "403"},
+		"GET /api/users/usage":             {path: "/api/users/usage", expect: "403"},
+		"PUT /api/users/{userId}":          {path: "/api/users/" + id(f.user), body: UserUpdateInput{DisplayName: ptr("Hijacked")}, expect: "403"},
+		"DELETE /api/users/{userId}":       {path: "/api/users/" + id(f.user), body: UserDeleteInput{Username: "x"}, expect: "403"},
+		"PUT /api/users/{userId}/password": {path: "/api/users/" + id(f.user) + "/password", body: UserPasswordInput{NewPassword: "long enough 1"}, expect: "403"},
+		"POST /api/users/{userId}/disable": {path: "/api/users/" + id(f.user) + "/disable", expect: "403"},
+		"POST /api/users/{userId}/enable":  {path: "/api/users/" + id(f.user) + "/enable", expect: "403"},
+		"PUT /api/account":                 {path: "/api/account", body: AccountInput{DisplayName: "B"}, expect: "own"},
+		"PUT /api/account/password":        {path: "/api/account/password", body: PasswordChangeInput{CurrentPassword: "x", NewPassword: "long enough 1"}, expect: "own"},
 
 		"GET /api/projects":                             {path: "/api/projects", expect: "own"},
 		"POST /api/projects":                            {path: "/api/projects", body: ProjectInput{Name: "B's novel"}, expect: "own"},
@@ -172,7 +178,7 @@ func TestIntegrationIsolation(t *testing.T) {
 	b := newEnv(t)
 	f := makeFixtures(t, a)
 	probes := isolationProbes(f)
-	ids := []string{f.project.String(), f.chapter.String(), f.version.String(), f.entry.String(), f.writer.String(), f.run.String(), f.critique.String(), f.issue.String(), f.revision.String(), f.draft.String(), f.proposal.String(), "A's novel", "Secret chapter", "A's critic"}
+	ids := []string{f.user.String(), f.project.String(), f.chapter.String(), f.version.String(), f.entry.String(), f.writer.String(), f.run.String(), f.critique.String(), f.issue.String(), f.revision.String(), f.draft.String(), f.proposal.String(), "A's novel", "Secret chapter", "A's critic"}
 
 	mux, ok := a.handler.(chi.Routes)
 	if !ok {

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, call, type UserRole } from "../api/client";
+import { api, call, type User, type UserRole } from "../api/client";
 import { keys, useMe, useUsersUsage, type StatsPeriod } from "../api/hooks";
-import { Badge, Button, ErrorBanner, Field, Input, PageHeader, Select, Spinner } from "../components/ui";
+import { Badge, Button, ConfirmDialog, Dialog, ErrorBanner, Field, Input, PageHeader, Select, Spinner } from "../components/ui";
 import { fmtCost, fmtDateTime, fmtTokens, timeAgo } from "../lib/format";
 
 const PERIODS: { value: StatsPeriod; label: string }[] = [
@@ -24,6 +24,29 @@ export default function UsersPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("author");
   const [created, setCreated] = useState<string | null>(null);
+  const [editing, setEditing] = useState<User | null>(null);
+  const [settingPassword, setSettingPassword] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState<User | null>(null);
+  const [toggling, setToggling] = useState<User | null>(null);
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["users", "usage"] });
+    qc.invalidateQueries({ queryKey: keys.users });
+  };
+  const toggle = useMutation({
+    mutationFn: (u: User) =>
+      call(u.disabled_at ? api.POST("/api/users/{userId}/enable", { params: { path: { userId: u.id } } }) : api.POST("/api/users/{userId}/disable", { params: { path: { userId: u.id } } })),
+    onSuccess: () => {
+      refresh();
+      setToggling(null);
+    },
+  });
+  const remove = useMutation({
+    mutationFn: (u: User) => call(api.DELETE("/api/users/{userId}", { params: { path: { userId: u.id } }, body: { username: u.username } })),
+    onSuccess: () => {
+      refresh();
+      setDeleting(null);
+    },
+  });
   const create = useMutation({
     mutationFn: () => call(api.POST("/api/users", { body: { username: username.trim(), display_name: displayName.trim() || undefined, password, role } })),
     onSuccess: (u) => {
@@ -79,6 +102,7 @@ export default function UsersPage() {
                     <th className="px-3 py-2 text-right font-medium">Tokens</th>
                     <th className="px-3 py-2 text-right font-medium">Cost</th>
                     <th className="px-3 py-2 font-medium">Last run</th>
+                    <th className="px-3 py-2 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -108,6 +132,28 @@ export default function UsersPage() {
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">{n.model_calls ? fmtCost(n.cost_usd, n.cost_estimated) : "—"}</td>
                       <td className="px-3 py-2 text-stone-500">{last_run_at ? timeAgo(last_run_at) : "—"}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => setEditing(u)}>
+                            Edit
+                          </Button>
+                          {u.id !== me.data?.user.id && (
+                            <>
+                              <Button size="sm" variant="ghost" onClick={() => setSettingPassword(u)}>
+                                Password
+                              </Button>
+                              <Button size="sm" variant={u.disabled_at ? "ghost" : "danger"} onClick={() => setToggling(u)}>
+                                {u.disabled_at ? "Enable" : "Disable"}
+                              </Button>
+                              {u.disabled_at && (
+                                <Button size="sm" variant="danger" onClick={() => setDeleting(u)}>
+                                  Delete
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -124,7 +170,7 @@ export default function UsersPage() {
                       {fmtTokens(usage.data.totals.prompt_tokens)} / {fmtTokens(usage.data.totals.completion_tokens)}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmtCost(usage.data.totals.cost_usd, usage.data.totals.cost_estimated)}</td>
-                    <td className="px-3 py-2" />
+                    <td className="px-3 py-2" colSpan={2} />
                   </tr>
                 </tfoot>
               </table>
@@ -162,6 +208,124 @@ export default function UsersPage() {
           </Button>
         </form>
       </div>
+      {editing && <EditUserDialog user={editing} self={editing.id === me.data?.user.id} onClose={() => setEditing(null)} onSaved={refresh} />}
+      {settingPassword && <SetPasswordDialog user={settingPassword} onClose={() => setSettingPassword(null)} />}
+      <ConfirmDialog
+        open={toggling !== null}
+        title={toggling?.disabled_at ? `Enable ${toggling?.username}?` : `Disable ${toggling?.username}?`}
+        message={
+          toggling?.disabled_at
+            ? "The account can sign in again. Its work was kept all along."
+            : "The account is signed out everywhere, its running runs are cancelled, and it cannot sign in until enabled again. Its projects, chapters and writers are kept."
+        }
+        confirmLabel={toggling?.disabled_at ? "Enable" : "Disable"}
+        danger={!toggling?.disabled_at}
+        busy={toggle.isPending}
+        onConfirm={() => toggling && toggle.mutate(toggling)}
+        onClose={() => setToggling(null)}
+      />
+      <ConfirmDialog
+        open={deleting !== null}
+        title={`Delete ${deleting?.username}?`}
+        message={
+          <>
+            This removes the account and everything it owns: projects, chapters, story bibles, writers, runs and stats. It cannot be undone.
+            <ErrorBanner error={remove.error} />
+          </>
+        }
+        confirmLabel="Delete everything"
+        typeToConfirm={deleting?.username}
+        busy={remove.isPending}
+        onConfirm={() => deleting && remove.mutate(deleting)}
+        onClose={() => setDeleting(null)}
+      />
+      <ErrorBanner error={toggle.error} />
     </div>
+  );
+}
+
+function EditUserDialog({ user, self, onClose, onSaved }: { user: User; self: boolean; onClose: () => void; onSaved: () => void }) {
+  const [displayName, setDisplayName] = useState(user.display_name);
+  const [role, setRole] = useState<UserRole>(user.role);
+  const save = useMutation({
+    mutationFn: () => call(api.PUT("/api/users/{userId}", { params: { path: { userId: user.id } }, body: { display_name: displayName.trim(), role: self ? undefined : role } })),
+    onSuccess: () => {
+      onSaved();
+      onClose();
+    },
+  });
+  return (
+    <Dialog open title={`Edit ${user.username}`} onClose={onClose}>
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+      >
+        <Field label="Display name">
+          <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={120} />
+        </Field>
+        <Field label="Role" help={self ? "Nobody changes their own role; ask another admin." : "One active admin always remains; the last one cannot be demoted."}>
+          <Select value={role} onChange={(e) => setRole(e.target.value as UserRole)} disabled={self}>
+            <option value="author">author</option>
+            <option value="admin">admin</option>
+          </Select>
+        </Field>
+        <ErrorBanner error={save.error} />
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" loading={save.isPending}>
+            Save
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+function SetPasswordDialog({ user, onClose }: { user: User; onClose: () => void }) {
+  const [password, setPassword] = useState("");
+  const [done, setDone] = useState(false);
+  const set = useMutation({
+    mutationFn: () => call(api.PUT("/api/users/{userId}/password", { params: { path: { userId: user.id } }, body: { new_password: password } })),
+    onSuccess: () => setDone(true),
+  });
+  return (
+    <Dialog open title={`Set a new password for ${user.username}`} onClose={onClose}>
+      {done ? (
+        <div className="space-y-4">
+          <p className="text-sm text-stone-700">The password was set and the account was signed out everywhere. Pass the new password on to the person.</p>
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={onClose}>
+              Done
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            set.mutate();
+          }}
+        >
+          <Field label="New password" help="At least 8 characters. The account is signed out everywhere.">
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required minLength={8} maxLength={72} autoFocus />
+          </Field>
+          <ErrorBanner error={set.error} />
+          <div className="flex justify-end gap-2">
+            <Button onClick={onClose} disabled={set.isPending}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" loading={set.isPending} disabled={password.length < 8}>
+              Set password
+            </Button>
+          </div>
+        </form>
+      )}
+    </Dialog>
   );
 }

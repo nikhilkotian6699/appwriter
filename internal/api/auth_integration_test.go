@@ -31,6 +31,7 @@ type authEnv struct {
 	pool    *pgxpool.Pool
 	q       *sqlcgen.Queries
 	tracker *runs.Tracker
+	engine  *runs.Engine
 	handler http.Handler
 	limiter *auth.Limiter
 	now     time.Time
@@ -54,7 +55,7 @@ func newAuthEnv(t *testing.T) *authEnv {
 	engine := runs.NewEngine(tracker, q, 30*time.Second, logger)
 	g := guild.New(engine, q, cfg.AppName, cfg.LLMTimeout)
 	signer, _ := auth.NewSigner("integration-test-secret-that-is-long-enough-0123456789")
-	e := &authEnv{t: t, pool: pool, q: q, tracker: tracker, now: time.Now(), user: user}
+	e := &authEnv{t: t, pool: pool, q: q, tracker: tracker, engine: engine, now: time.Now(), user: user}
 	e.limiter = auth.NewLimiter()
 	e.limiter.Now = func() time.Time { return e.now }
 	srv := NewServer(cfg, pool, q, mock, g, engine, Auth{Signer: signer, Limiter: e.limiter, MaxAge: time.Hour}, logger)
@@ -360,5 +361,186 @@ func TestIntegrationUsersAndAccount(t *testing.T) {
 	}
 	if rec := e.do("GET", "/api/users/usage", "", fresh.Value, ""); rec.Code != 403 {
 		t.Fatalf("author reading usage: %d", rec.Code)
+	}
+}
+
+// TestIntegrationManageAccounts covers roles, passwords, disabling, enabling
+// and deleting other accounts, the two rules (nobody changes their own role
+// or access; one active admin always remains), and that two admins acting
+// at the same moment cannot both demote each other.
+func TestIntegrationManageAccounts(t *testing.T) {
+	e := newAuthEnv(t)
+	ctx := context.Background()
+	if err := e.q.SetUserRole(ctx, sqlcgen.SetUserRoleParams{ID: e.user.ID, Role: "admin"}); err != nil {
+		t.Fatal(err)
+	}
+	login := func(username, password string) *httptest.ResponseRecorder {
+		return e.do("POST", "/api/auth/login", `{"username":"`+username+`","password":"`+password+`"}`, "", "10.0.0.3")
+	}
+	admin := sessionFrom(login(e.user.Username, "correct horse battery"))
+	if admin == nil {
+		t.Fatal("admin login failed")
+	}
+	other := "m" + strings.ToLower(e.user.Username[1:7]) + "y"
+	if rec := e.do("POST", "/api/users", `{"username":"`+other+`","password":"first password 1","role":"author"}`, admin.Value, ""); rec.Code != 201 {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+	}
+	target, _ := e.q.GetUserByUsername(ctx, other)
+	t.Cleanup(func() { _ = e.q.DeleteUser(context.Background(), target.ID) })
+	tid := target.ID.String()
+
+	// Display name and role.
+	rec := e.do("PUT", "/api/users/"+tid, `{"display_name":" Other One ","role":"admin"}`, admin.Value, "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"display_name":"Other One"`) || !strings.Contains(rec.Body.String(), `"role":"admin"`) {
+		t.Fatalf("update: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := e.do("PUT", "/api/users/"+e.user.ID.String(), `{"role":"author"}`, admin.Value, ""); rec.Code != 403 {
+		t.Fatalf("own role: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := e.do("PUT", "/api/users/"+e.user.ID.String(), `{"display_name":"Me"}`, admin.Value, ""); rec.Code != 200 {
+		t.Fatalf("own display name through the admin route is fine: %d", rec.Code)
+	}
+	if rec := e.do("PUT", "/api/users/"+tid, `{"role":"editor"}`, admin.Value, ""); rec.Code != 400 {
+		t.Fatalf("bad role: %d", rec.Code)
+	}
+	if rec := e.do("PUT", "/api/users/"+uuid.New().String(), `{"role":"author"}`, admin.Value, ""); rec.Code != 404 {
+		t.Fatalf("unknown account: %d", rec.Code)
+	}
+
+	// Two admins demote each other at the same moment: exactly one succeeds.
+	otherCookie := sessionFrom(login(other, "first password 1"))
+	results := make(chan int, 2)
+	go func() { results <- e.do("PUT", "/api/users/"+tid, `{"role":"author"}`, admin.Value, "").Code }()
+	go func() {
+		results <- e.do("PUT", "/api/users/"+e.user.ID.String(), `{"role":"author"}`, otherCookie.Value, "").Code
+	}()
+	codes := []int{<-results, <-results}
+	// One demotion goes through. The other is refused with 409 (the lock
+	// made it see a single active admin) or 403 (it was itself demoted
+	// before its request was authenticated); either way the rule holds.
+	refused := func(c int) bool { return c == 409 || c == 403 }
+	if !((codes[0] == 200 && refused(codes[1])) || (refused(codes[0]) && codes[1] == 200)) {
+		t.Fatalf("concurrent demotions: %v, want one 200 and one refusal", codes)
+	}
+	if n, _ := e.q.CountActiveAdmins(ctx); n != 1 {
+		t.Fatalf("active admins after the race: %d", n)
+	}
+	// Whoever is left cannot be demoted or disabled.
+	var remaining sqlcgen.User
+	for _, id := range []uuid.UUID{e.user.ID, target.ID} {
+		if u, _ := e.q.GetUserByID(ctx, id); u.Role == "admin" {
+			remaining = u
+		}
+	}
+	remCookie := admin
+	if remaining.ID == target.ID {
+		remCookie = otherCookie
+	}
+	loserID := e.user.ID
+	if remaining.ID == e.user.ID {
+		loserID = target.ID
+	}
+	// Give the loser admin back so the test can continue with two admins, then take it away properly.
+	if rec := e.do("PUT", "/api/users/"+loserID.String(), `{"role":"admin"}`, remCookie.Value, ""); rec.Code != 200 {
+		t.Fatalf("re-promote: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := e.do("PUT", "/api/users/"+loserID.String(), `{"role":"author"}`, remCookie.Value, ""); rec.Code != 200 {
+		t.Fatalf("demote with two admins: %d", rec.Code)
+	}
+	if rec := e.do("POST", "/api/users/"+remaining.ID.String()+"/disable", "", remCookie.Value, ""); rec.Code != 403 {
+		t.Fatalf("disable self: %d", rec.Code)
+	}
+	// Make the loser an admin again and try to disable the other admin twice: the second time it is the last one.
+	adminID, authorID := remaining.ID, loserID
+	adminCookie := remCookie
+	if rec := e.do("PUT", "/api/users/"+authorID.String(), `{"role":"admin"}`, adminCookie.Value, ""); rec.Code != 200 {
+		t.Fatal("promote back")
+	}
+	// Disable the (now admin) other account: fine, one active admin remains.
+	// First give it a running run to see it cancelled.
+	loser, _ := e.q.GetUserByID(ctx, authorID)
+	started := make(chan struct{})
+	run, err := e.engine.Launch(ctx, runs.StartParams{User: loser, Kind: runs.KindCowrite}, func(ctx context.Context, run *runs.Run, em *runs.Emitter) (any, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	loserCookie := sessionFrom(login(loser.Username, "first password 1"))
+	if loserCookie == nil {
+		t.Fatal("loser login")
+	}
+	rec = e.do("POST", "/api/users/"+authorID.String()+"/disable", "", adminCookie.Value, "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"disabled_at"`) {
+		t.Fatalf("disable: %d %s", rec.Code, rec.Body.String())
+	}
+	if r2, _ := e.q.GetRun(ctx, sqlcgen.GetRunParams{ID: run.Row.ID, UserID: loser.ID}); r2.Status != "cancelled" {
+		t.Fatalf("run of a disabled account should be cancelled, is %q", r2.Status)
+	}
+	if rec := e.do("GET", "/api/me", "", loserCookie.Value, ""); rec.Code != 401 {
+		t.Fatalf("disabled session: %d", rec.Code)
+	}
+	if rec := login(loser.Username, "first password 1"); rec.Code != 401 {
+		t.Fatalf("disabled login: %d", rec.Code)
+	}
+	if ws, _ := e.q.ListWriters(ctx, loser.ID); len(ws) == 0 {
+		t.Fatal("disabling must keep the account's work")
+	}
+	// Now the remaining admin is the last active one.
+	if rec := e.do("PUT", "/api/users/"+adminID.String(), `{"role":"author"}`, adminCookie.Value, ""); rec.Code != 403 {
+		t.Fatalf("own role as last admin: %d", rec.Code)
+	}
+	// Disabling it again is idempotent; enabling brings it back.
+	if rec := e.do("POST", "/api/users/"+authorID.String()+"/disable", "", adminCookie.Value, ""); rec.Code != 200 {
+		t.Fatalf("disable twice: %d", rec.Code)
+	}
+	if rec := e.do("POST", "/api/users/"+authorID.String()+"/enable", "", adminCookie.Value, ""); rec.Code != 200 || strings.Contains(rec.Body.String(), `"disabled_at"`) {
+		t.Fatalf("enable: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := login(loser.Username, "first password 1"); rec.Code != 200 {
+		t.Fatalf("login after enable: %d", rec.Code)
+	}
+	// Set a new password for the other account; it is signed out everywhere.
+	back := sessionFrom(login(loser.Username, "first password 1"))
+	if rec := e.do("PUT", "/api/users/"+authorID.String()+"/password", `{"new_password":"short"}`, adminCookie.Value, ""); rec.Code != 400 {
+		t.Fatalf("short admin-set password: %d", rec.Code)
+	}
+	if rec := e.do("PUT", "/api/users/"+adminID.String()+"/password", `{"new_password":"long enough 12"}`, adminCookie.Value, ""); rec.Code != 400 {
+		t.Fatalf("own password through the admin route: %d", rec.Code)
+	}
+	if rec := e.do("PUT", "/api/users/"+authorID.String()+"/password", `{"new_password":"reset by admin 9"}`, adminCookie.Value, ""); rec.Code != 204 {
+		t.Fatalf("set password: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := e.do("GET", "/api/me", "", back.Value, ""); rec.Code != 401 {
+		t.Fatalf("session after admin reset: %d", rec.Code)
+	}
+	if rec := login(loser.Username, "reset by admin 9"); rec.Code != 200 {
+		t.Fatalf("login with the admin-set password: %d", rec.Code)
+	}
+	// Delete: only disabled accounts, only with the username typed, never oneself.
+	if rec := e.do("DELETE", "/api/users/"+authorID.String(), `{"username":"`+loser.Username+`"}`, adminCookie.Value, ""); rec.Code != 409 {
+		t.Fatalf("delete an enabled account: %d", rec.Code)
+	}
+	e.do("POST", "/api/users/"+authorID.String()+"/disable", "", adminCookie.Value, "")
+	if rec := e.do("DELETE", "/api/users/"+authorID.String(), `{"username":"someone-else"}`, adminCookie.Value, ""); rec.Code != 400 {
+		t.Fatalf("delete with the wrong username: %d", rec.Code)
+	}
+	if rec := e.do("DELETE", "/api/users/"+adminID.String(), `{"username":"`+remaining.Username+`"}`, adminCookie.Value, ""); rec.Code != 403 {
+		t.Fatalf("delete self: %d", rec.Code)
+	}
+	if rec := e.do("DELETE", "/api/users/"+authorID.String(), `{"username":"`+strings.ToUpper(loser.Username)+`"}`, adminCookie.Value, ""); rec.Code != 204 {
+		t.Fatalf("delete: %d %s", rec.Code, rec.Body.String())
+	}
+	if _, err := e.q.GetUserByID(ctx, authorID); err == nil {
+		t.Fatal("the account should be gone")
+	}
+	if ws, _ := e.q.ListWriters(ctx, authorID); len(ws) != 0 {
+		t.Fatal("the account's work should be gone with it")
+	}
+	if rec := e.do("DELETE", "/api/users/"+authorID.String(), `{"username":"x"}`, adminCookie.Value, ""); rec.Code != 404 {
+		t.Fatalf("delete twice: %d", rec.Code)
 	}
 }

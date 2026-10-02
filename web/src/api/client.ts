@@ -10,6 +10,7 @@ export type UserCreateInput = Schemas["UserCreateInput"];
 export type UsagePage = Schemas["UsagePage"];
 export type AccountUsage = Schemas["AccountUsage"];
 export type UsageNumbers = Schemas["UsageNumbers"];
+export type UserUpdateInput = Schemas["UserUpdateInput"];
 export type Project = Schemas["Project"];
 export type ProjectSummary = Schemas["ProjectSummary"];
 export type ProjectInput = Schemas["ProjectInput"];

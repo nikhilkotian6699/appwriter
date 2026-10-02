@@ -92,6 +92,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["userId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change an account's display name or role (admins only)
+         * @description Nobody changes their own role (403), and one active admin always
+         *     remains: demoting the last one answers 409. Changes are serialized,
+         *     so two admins acting at the same moment cannot slip past the rule.
+         */
+        put: operations["updateUser"];
+        post?: never;
+        /**
+         * Delete a disabled account and everything it owns (admins only)
+         * @description The account must be disabled first (409 otherwise) and the body must
+         *     repeat its username (400 otherwise). Nobody deletes their own account.
+         */
+        delete: operations["deleteUser"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["userId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a new password for another account (admins only); it is signed out everywhere */
+        put: operations["setUserPassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["userId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable an account (admins only); it is signed out, its runs are cancelled, its work is kept
+         * @description Nobody disables their own account (403); the last active admin cannot be disabled (409).
+         */
+        post: operations["disableUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{userId}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["userId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable a disabled account again (admins only) */
+        post: operations["enableUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account": {
         parameters: {
             query?: never;
@@ -1696,6 +1785,18 @@ export interface components {
             accounts: components["schemas"]["AccountUsage"][];
             totals: components["schemas"]["UsageNumbers"];
         };
+        UserUpdateInput: {
+            display_name?: string;
+            /** @enum {string} */
+            role?: "admin" | "author";
+        };
+        UserPasswordInput: {
+            new_password: string;
+        };
+        UserDeleteInput: {
+            /** @description Must repeat the account's username */
+            username: string;
+        };
     };
     responses: {
         /** @description Error */
@@ -1719,6 +1820,7 @@ export interface components {
         revisionId: string;
         proposalId: string;
         draftId: string;
+        userId: string;
     };
     requestBodies: never;
     headers: never;
@@ -1834,6 +1936,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsagePage"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    updateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["userId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdateInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["userId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserDeleteInput"];
+            };
+        };
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    setUserPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["userId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserPasswordInput"];
+            };
+        };
+        responses: {
+            /** @description Set */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    disableUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["userId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    enableUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["parameters"]["userId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
                 };
             };
             default: components["responses"]["Error"];

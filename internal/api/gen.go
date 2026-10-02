@@ -437,6 +437,24 @@ func (e UserCreateInputRole) Valid() bool {
 	}
 }
 
+// Defines values for UserUpdateInputRole.
+const (
+	UserUpdateInputRoleAdmin  UserUpdateInputRole = "admin"
+	UserUpdateInputRoleAuthor UserUpdateInputRole = "author"
+)
+
+// Valid indicates whether the value is a known member of the UserUpdateInputRole enum.
+func (e UserUpdateInputRole) Valid() bool {
+	switch e {
+	case UserUpdateInputRoleAdmin:
+		return true
+	case UserUpdateInputRoleAuthor:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WriterRole.
 const (
 	CoWriter WriterRole = "co-writer"
@@ -1226,6 +1244,26 @@ type UserCreateInput struct {
 // UserCreateInputRole defines model for UserCreateInput.Role.
 type UserCreateInputRole string
 
+// UserDeleteInput defines model for UserDeleteInput.
+type UserDeleteInput struct {
+	// Username Must repeat the account's username
+	Username string `json:"username"`
+}
+
+// UserPasswordInput defines model for UserPasswordInput.
+type UserPasswordInput struct {
+	NewPassword string `json:"new_password"`
+}
+
+// UserUpdateInput defines model for UserUpdateInput.
+type UserUpdateInput struct {
+	DisplayName *string              `json:"display_name,omitempty"`
+	Role        *UserUpdateInputRole `json:"role,omitempty"`
+}
+
+// UserUpdateInputRole defines model for UserUpdateInput.Role.
+type UserUpdateInputRole string
+
 // Writer defines model for Writer.
 type Writer struct {
 	CreatedAt    time.Time          `json:"created_at"`
@@ -1333,6 +1371,9 @@ type RevisionId = openapi_types.UUID
 
 // RunId defines model for runId.
 type RunId = openapi_types.UUID
+
+// UserId defines model for userId.
+type UserId = openapi_types.UUID
 
 // VersionId defines model for versionId.
 type VersionId = openapi_types.UUID
@@ -1457,6 +1498,15 @@ type UpdateSettingsJSONRequestBody = SettingsInput
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = UserCreateInput
+
+// DeleteUserJSONRequestBody defines body for DeleteUser for application/json ContentType.
+type DeleteUserJSONRequestBody = UserDeleteInput
+
+// UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
+type UpdateUserJSONRequestBody = UserUpdateInput
+
+// SetUserPasswordJSONRequestBody defines body for SetUserPassword for application/json ContentType.
+type SetUserPasswordJSONRequestBody = UserPasswordInput
 
 // CreateWriterJSONRequestBody defines body for CreateWriter for application/json ContentType.
 type CreateWriterJSONRequestBody = WriterInput
@@ -1631,6 +1681,21 @@ type ServerInterface interface {
 	// GetUsersUsage What every account holds and used (admins only)
 	// (GET /api/users/usage)
 	GetUsersUsage(w http.ResponseWriter, r *http.Request, params GetUsersUsageParams)
+	// DeleteUser Delete a disabled account and everything it owns (admins only)
+	// (DELETE /api/users/{userId})
+	DeleteUser(w http.ResponseWriter, r *http.Request, userId UserId)
+	// UpdateUser Change an account's display name or role (admins only)
+	// (PUT /api/users/{userId})
+	UpdateUser(w http.ResponseWriter, r *http.Request, userId UserId)
+	// DisableUser Disable an account (admins only); it is signed out, its runs are cancelled, its work is kept
+	// (POST /api/users/{userId}/disable)
+	DisableUser(w http.ResponseWriter, r *http.Request, userId UserId)
+	// EnableUser Enable a disabled account again (admins only)
+	// (POST /api/users/{userId}/enable)
+	EnableUser(w http.ResponseWriter, r *http.Request, userId UserId)
+	// SetUserPassword Set a new password for another account (admins only); it is signed out everywhere
+	// (PUT /api/users/{userId}/password)
+	SetUserPassword(w http.ResponseWriter, r *http.Request, userId UserId)
 
 	// (GET /api/writers)
 	ListWriters(w http.ResponseWriter, r *http.Request)
@@ -1960,6 +2025,36 @@ func (_ Unimplemented) CreateUser(w http.ResponseWriter, r *http.Request) {
 // GetUsersUsage What every account holds and used (admins only)
 // (GET /api/users/usage)
 func (_ Unimplemented) GetUsersUsage(w http.ResponseWriter, r *http.Request, params GetUsersUsageParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteUser Delete a disabled account and everything it owns (admins only)
+// (DELETE /api/users/{userId})
+func (_ Unimplemented) DeleteUser(w http.ResponseWriter, r *http.Request, userId UserId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateUser Change an account's display name or role (admins only)
+// (PUT /api/users/{userId})
+func (_ Unimplemented) UpdateUser(w http.ResponseWriter, r *http.Request, userId UserId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DisableUser Disable an account (admins only); it is signed out, its runs are cancelled, its work is kept
+// (POST /api/users/{userId}/disable)
+func (_ Unimplemented) DisableUser(w http.ResponseWriter, r *http.Request, userId UserId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// EnableUser Enable a disabled account again (admins only)
+// (POST /api/users/{userId}/enable)
+func (_ Unimplemented) EnableUser(w http.ResponseWriter, r *http.Request, userId UserId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetUserPassword Set a new password for another account (admins only); it is signed out everywhere
+// (PUT /api/users/{userId}/password)
+func (_ Unimplemented) SetUserPassword(w http.ResponseWriter, r *http.Request, userId UserId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3474,6 +3569,136 @@ func (siw *ServerInterfaceWrapper) GetUsersUsage(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUser(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateUser operation middleware
+func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateUser(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableUser operation middleware
+func (siw *ServerInterfaceWrapper) DisableUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableUser(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableUser operation middleware
+func (siw *ServerInterfaceWrapper) EnableUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableUser(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetUserPassword operation middleware
+func (siw *ServerInterfaceWrapper) SetUserPassword(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId UserId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", chi.URLParam(r, "userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetUserPassword(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListWriters operation middleware
 func (siw *ServerInterfaceWrapper) ListWriters(w http.ResponseWriter, r *http.Request) {
 
@@ -3747,6 +3972,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/users/usage", wrapper.GetUsersUsage)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/users/{userId}", wrapper.DeleteUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/users/{userId}", wrapper.UpdateUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/users/{userId}/password", wrapper.SetUserPassword)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/users/{userId}/disable", wrapper.DisableUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/users/{userId}/enable", wrapper.EnableUser)
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/account", wrapper.UpdateAccount)
