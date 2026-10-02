@@ -216,3 +216,94 @@ func TestIntegrationLoginLockout(t *testing.T) {
 		t.Fatalf("unknown username lockout: %d", rec.Code)
 	}
 }
+
+// TestIntegrationUsersAndAccount covers adding accounts (admins only), the
+// account page's changes, and that a password change ends other sessions
+// while keeping this one.
+func TestIntegrationUsersAndAccount(t *testing.T) {
+	e := newAuthEnv(t)
+	ctx := context.Background()
+	if err := e.q.SetUserRole(ctx, sqlcgen.SetUserRoleParams{ID: e.user.ID, Role: "admin"}); err != nil {
+		t.Fatal(err)
+	}
+	login := func(username, password string) *httptest.ResponseRecorder {
+		return e.do("POST", "/api/auth/login", `{"username":"`+username+`","password":"`+password+`"}`, "", "10.0.0.2")
+	}
+	admin := sessionFrom(login(e.user.Username, "correct horse battery"))
+	if admin == nil {
+		t.Fatal("admin login failed")
+	}
+
+	// Add an author.
+	newName := "t" + strings.ToLower(e.user.Username[1:7]) + "x"
+	rec := e.do("POST", "/api/users", `{"username":"`+strings.ToUpper(newName)+`","display_name":"  Paige Turner ","password":"first password 1","role":"author"}`, admin.Value, "")
+	if rec.Code != 201 || !strings.Contains(rec.Body.String(), `"username":"`+newName+`"`) || !strings.Contains(rec.Body.String(), `"display_name":"Paige Turner"`) {
+		t.Fatalf("create user: %d %s", rec.Code, rec.Body.String())
+	}
+	author, err := e.q.GetUserByUsername(ctx, newName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = e.q.DeleteUser(context.Background(), author.ID) })
+	if writers, _ := e.q.ListWriters(ctx, author.ID); len(writers) != 8 {
+		t.Fatalf("new account should be seeded with 8 writers, got %d", len(writers))
+	}
+	if rec := e.do("GET", "/api/users", "", admin.Value, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), newName) || strings.Contains(rec.Body.String(), "password") {
+		t.Fatalf("list users: %d %s", rec.Code, rec.Body.String()[:min(200, len(rec.Body.String()))])
+	}
+	// Validation and uniqueness.
+	for body, want := range map[string]int{
+		`{"username":"Ab","password":"first password 1","role":"author"}`:              400,
+		`{"username":"newperson","password":"short","role":"author"}`:                  400,
+		`{"username":"newperson","password":"first password 1","role":"editor"}`:       400,
+		`{"username":"` + newName + `","password":"first password 1","role":"author"}`: 409,
+	} {
+		if rec := e.do("POST", "/api/users", body, admin.Value, ""); rec.Code != want {
+			t.Fatalf("create %s: %d, want %d: %s", body, rec.Code, want, rec.Body.String())
+		}
+	}
+
+	// The author can sign in, but cannot see or add accounts.
+	authorCookie := sessionFrom(login(newName, "first password 1"))
+	if authorCookie == nil {
+		t.Fatal("author login failed")
+	}
+	if rec := e.do("GET", "/api/users", "", authorCookie.Value, ""); rec.Code != 403 || !strings.Contains(rec.Body.String(), "forbidden") {
+		t.Fatalf("author listing users: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := e.do("POST", "/api/users", `{"username":"sneaky","password":"first password 1","role":"admin"}`, authorCookie.Value, ""); rec.Code != 403 {
+		t.Fatalf("author adding users: %d", rec.Code)
+	}
+
+	// Account page: display name, then password.
+	if rec := e.do("PUT", "/api/account", `{"display_name":" P. Turner "}`, authorCookie.Value, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"display_name":"P. Turner"`) {
+		t.Fatalf("display name: %d %s", rec.Code, rec.Body.String())
+	}
+	second := sessionFrom(login(newName, "first password 1")) // another browser
+	if rec := e.do("PUT", "/api/account/password", `{"current_password":"wrong","new_password":"second password 2"}`, authorCookie.Value, ""); rec.Code != 400 || !strings.Contains(rec.Body.String(), "wrong_password") {
+		t.Fatalf("wrong current password: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := e.do("PUT", "/api/account/password", `{"current_password":"first password 1","new_password":"short"}`, authorCookie.Value, ""); rec.Code != 400 {
+		t.Fatalf("short new password: %d", rec.Code)
+	}
+	changed := e.do("PUT", "/api/account/password", `{"current_password":"first password 1","new_password":"second password 2"}`, authorCookie.Value, "")
+	if changed.Code != 204 {
+		t.Fatalf("change password: %d %s", changed.Code, changed.Body.String())
+	}
+	fresh := sessionFrom(changed)
+	if fresh == nil || fresh.Value == authorCookie.Value {
+		t.Fatal("a password change should issue a fresh cookie for this browser")
+	}
+	if rec := e.do("GET", "/api/me", "", fresh.Value, ""); rec.Code != 200 {
+		t.Fatalf("this browser should stay signed in: %d", rec.Code)
+	}
+	if rec := e.do("GET", "/api/me", "", second.Value, ""); rec.Code != 401 {
+		t.Fatalf("the other browser should be signed out: %d", rec.Code)
+	}
+	if rec := login(newName, "first password 1"); rec.Code != 401 {
+		t.Fatalf("old password still works: %d", rec.Code)
+	}
+	if rec := login(newName, "second password 2"); rec.Code != 200 {
+		t.Fatalf("new password: %d %s", rec.Code, rec.Body.String())
+	}
+}

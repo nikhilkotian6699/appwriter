@@ -61,6 +61,11 @@ export function Layout() {
               <NavLink to="/settings" className={navClass}>
                 Settings
               </NavLink>
+              {me.data?.user.role === "admin" && (
+                <NavLink to="/users" className={navClass}>
+                  Users
+                </NavLink>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-4 text-sm">
@@ -68,9 +73,9 @@ export function Layout() {
               Guide ↗
             </a>
             {me.data && (
-              <span className="text-stone-500" title={me.data.user.role}>
+              <NavLink to="/account" className="text-stone-600 hover:text-stone-900 hover:underline" title={`${me.data.user.role} · your account`}>
                 {me.data.user.display_name || me.data.user.username}
-              </span>
+              </NavLink>
             )}
             <Button size="sm" variant="ghost" onClick={() => logout.mutate()} loading={logout.isPending} title="Sign out of this browser">
               Sign out

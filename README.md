@@ -118,7 +118,13 @@ The first account is created at the first start from `APP_USERNAME` and
 lost password (and signs that account out everywhere). An installation that
 had a single user before accounts arrived keeps everything: that user is the
 admin. Roles are admin and author; only an admin adds accounts, on the Users
-page, and there is no sign-up form.
+page (`GET`/`POST /api/users`), with a username, an optional display name, a
+first password and a role; there is no sign-up form. A new account starts
+with its own settings, the example writers and the system agents. Every
+account has an Account page (`PUT /api/account`, `PUT /api/account/password`)
+to change its display name and its password: at least 8 characters, current
+password required, and a change signs the account out everywhere else while
+the browser that made it keeps a fresh session.
 
 ## Development
 

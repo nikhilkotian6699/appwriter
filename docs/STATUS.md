@@ -19,7 +19,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 4 | Revision with diff and hunks, bible-keeper proposals | Built on 3 feature branches, awaiting merge | see branches |
 | 5 | Co-writing workflow and compare mode | Built on 2 feature branches, awaiting merge | see branches |
 | 6 | Run history, cost and writer stats, settings page | Built on 2 feature branches, awaiting merge | see branches |
-| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | In progress (auth-lib, login pushed) | |
+| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | In progress (auth-lib, login, users-and-account-pages pushed) | |
 | 8 | Account management: usage per user, roles, passwords, disable, delete | Not started | |
 | 9 | In-app guide for new users | Not started | |
 
@@ -50,7 +50,7 @@ branch is merged.
 | 6 | `feature/writer-stats` | — | Pushed (awaiting merge) |
 | 7 | `feature/auth-lib` | — | Pushed (awaiting merge) |
 | 7 | `feature/login` | auth-lib | Pushed (awaiting merge) |
-| 7 | `feature/users-and-account-pages` | login | Not started |
+| 7 | `feature/users-and-account-pages` | login | Pushed (awaiting merge) |
 | 7 | `feature/isolation-test` | login | Not started |
 | 8 | `feature/account-usage` | users-and-account-pages | Not started |
 | 8 | `feature/account-management` | users-and-account-pages | Not started |
@@ -204,7 +204,15 @@ when work started):
   login page with lockout message and Guide link, Sign out button, any 401
   returns the app to the login page; integration tests for sessions and
   lockouts.
-- Next: `feature/users-and-account-pages`.
+- `feature/users-and-account-pages` is done and pushed: GET/POST /api/users
+  (admins only; username rules, first password, role, 409 on a taken name;
+  new accounts seeded), PUT /api/account (display name), PUT
+  /api/account/password (current password required, 8+ characters, auth
+  version bumped so other sessions end, fresh cookie for this browser);
+  Users page with the account list and an add form (admins; nav link only
+  for admins), Account page (display name, password change), the header
+  name links to it; integration coverage.
+- Next: `feature/isolation-test`.
 
 ## Open items
 

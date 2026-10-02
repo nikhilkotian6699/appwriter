@@ -403,16 +403,34 @@ func (e RunStatus) Valid() bool {
 
 // Defines values for UserRole.
 const (
-	Admin  UserRole = "admin"
-	Author UserRole = "author"
+	UserRoleAdmin  UserRole = "admin"
+	UserRoleAuthor UserRole = "author"
 )
 
 // Valid indicates whether the value is a known member of the UserRole enum.
 func (e UserRole) Valid() bool {
 	switch e {
-	case Admin:
+	case UserRoleAdmin:
 		return true
-	case Author:
+	case UserRoleAuthor:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UserCreateInputRole.
+const (
+	UserCreateInputRoleAdmin  UserCreateInputRole = "admin"
+	UserCreateInputRoleAuthor UserCreateInputRole = "author"
+)
+
+// Valid indicates whether the value is a known member of the UserCreateInputRole enum.
+func (e UserCreateInputRole) Valid() bool {
+	switch e {
+	case UserCreateInputRoleAdmin:
+		return true
+	case UserCreateInputRoleAuthor:
 		return true
 	default:
 		return false
@@ -459,6 +477,11 @@ func (e GetWriterStatsParamsPeriod) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// AccountInput defines model for AccountInput.
+type AccountInput struct {
+	DisplayName string `json:"display_name"`
 }
 
 // BibleConflict defines model for BibleConflict.
@@ -959,6 +982,12 @@ type ModelCall struct {
 // ModelCallStatus defines model for ModelCall.Status.
 type ModelCallStatus string
 
+// PasswordChangeInput defines model for PasswordChangeInput.
+type PasswordChangeInput struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 // Project defines model for Project.
 type Project struct {
 	CreatedAt   time.Time          `json:"created_at"`
@@ -1133,6 +1162,17 @@ type User struct {
 // UserRole defines model for User.Role.
 type UserRole string
 
+// UserCreateInput defines model for UserCreateInput.
+type UserCreateInput struct {
+	DisplayName *string             `json:"display_name,omitempty"`
+	Password    string              `json:"password"`
+	Role        UserCreateInputRole `json:"role"`
+	Username    string              `json:"username"`
+}
+
+// UserCreateInputRole defines model for UserCreateInput.Role.
+type UserCreateInputRole string
+
 // Writer defines model for Writer.
 type Writer struct {
 	CreatedAt    time.Time          `json:"created_at"`
@@ -1294,6 +1334,12 @@ type GetWriterStatsParams struct {
 // GetWriterStatsParamsPeriod defines parameters for GetWriterStats.
 type GetWriterStatsParamsPeriod string
 
+// UpdateAccountJSONRequestBody defines body for UpdateAccount for application/json ContentType.
+type UpdateAccountJSONRequestBody = AccountInput
+
+// ChangePasswordJSONRequestBody defines body for ChangePassword for application/json ContentType.
+type ChangePasswordJSONRequestBody = PasswordChangeInput
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginInput
 
@@ -1348,6 +1394,9 @@ type ApplyRevisionJSONRequestBody = RevisionApplyInput
 // UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
 type UpdateSettingsJSONRequestBody = SettingsInput
 
+// CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
+type CreateUserJSONRequestBody = UserCreateInput
+
 // CreateWriterJSONRequestBody defines body for CreateWriter for application/json ContentType.
 type CreateWriterJSONRequestBody = WriterInput
 
@@ -1359,6 +1408,12 @@ type UpdateWriterJSONRequestBody = WriterInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// UpdateAccount Change the display name of the signed-in account
+	// (PUT /api/account)
+	UpdateAccount(w http.ResponseWriter, r *http.Request)
+	// ChangePassword Change the signed-in account's password
+	// (PUT /api/account/password)
+	ChangePassword(w http.ResponseWriter, r *http.Request)
 	// Login Sign in with username and password
 	// (POST /api/auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
@@ -1506,6 +1561,12 @@ type ServerInterface interface {
 	// GetWriterStats Acceptance rates and cost per writer, by period and project
 	// (GET /api/stats/writers)
 	GetWriterStats(w http.ResponseWriter, r *http.Request, params GetWriterStatsParams)
+	// ListUsers Every account (admins only)
+	// (GET /api/users)
+	ListUsers(w http.ResponseWriter, r *http.Request)
+	// CreateUser Add an account (admins only); there is no sign-up form
+	// (POST /api/users)
+	CreateUser(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/writers)
 	ListWriters(w http.ResponseWriter, r *http.Request)
@@ -1532,6 +1593,18 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// UpdateAccount Change the display name of the signed-in account
+// (PUT /api/account)
+func (_ Unimplemented) UpdateAccount(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ChangePassword Change the signed-in account's password
+// (PUT /api/account/password)
+func (_ Unimplemented) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Login Sign in with username and password
 // (POST /api/auth/login)
@@ -1808,6 +1881,18 @@ func (_ Unimplemented) GetWriterStats(w http.ResponseWriter, r *http.Request, pa
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListUsers Every account (admins only)
+// (GET /api/users)
+func (_ Unimplemented) ListUsers(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateUser Add an account (admins only); there is no sign-up form
+// (POST /api/users)
+func (_ Unimplemented) CreateUser(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/writers)
 func (_ Unimplemented) ListWriters(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1852,6 +1937,34 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// UpdateAccount operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAccount(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAccount(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangePassword operation middleware
+func (siw *ServerInterfaceWrapper) ChangePassword(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangePassword(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
@@ -3230,6 +3343,34 @@ func (siw *ServerInterfaceWrapper) GetWriterStats(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateUser operation middleware
+func (siw *ServerInterfaceWrapper) CreateUser(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListWriters operation middleware
 func (siw *ServerInterfaceWrapper) ListWriters(w http.ResponseWriter, r *http.Request) {
 
@@ -3494,6 +3635,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/auth/logout", wrapper.Logout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/users", wrapper.ListUsers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/users", wrapper.CreateUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/account", wrapper.UpdateAccount)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/account/password", wrapper.ChangePassword)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/me", wrapper.GetMe)

@@ -8,6 +8,8 @@ import WritersPage from "./pages/WritersPage";
 import SettingsPage from "./pages/SettingsPage";
 import HistoryPage from "./pages/HistoryPage";
 import StatsPage from "./pages/StatsPage";
+import UsersPage from "./pages/UsersPage";
+import AccountPage from "./pages/AccountPage";
 
 export default function App() {
   return (
@@ -22,6 +24,8 @@ export default function App() {
         <Route path="/writers" element={<WritersPage />} />
         <Route path="/writers/stats" element={<StatsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/users" element={<UsersPage />} />
+        <Route path="/account" element={<AccountPage />} />
         <Route path="*" element={<div className="p-8 text-stone-600">There is nothing at this address.</div>} />
       </Route>
     </Routes>

@@ -44,6 +44,74 @@ paths:
           description: The session cookie was cleared
         default: { $ref: "#/components/responses/Error" }
 
+  /api/users:
+    get:
+      operationId: listUsers
+      summary: Every account (admins only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/User" }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createUser
+      summary: Add an account (admins only); there is no sign-up form
+      description: |
+        The new account gets its own settings, example writers and system
+        agents. Usernames are lower-case, 3 to 32 characters; a taken
+        username answers 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreateInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/account:
+    put:
+      operationId: updateAccount
+      summary: Change the display name of the signed-in account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/account/password:
+    put:
+      operationId: changePassword
+      summary: Change the signed-in account's password
+      description: |
+        Requires the current password; the new one needs at least 8
+        characters. Every other session of the account ends; this browser
+        receives a fresh session cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordChangeInput" }
+      responses:
+        "204":
+          description: Changed; a fresh session cookie was set
+        default: { $ref: "#/components/responses/Error" }
+
   /api/me:
     get:
       operationId: getMe
@@ -1841,3 +1909,25 @@ components:
       properties:
         username: { type: string, maxLength: 64 }
         password: { type: string, maxLength: 256 }
+
+    UserCreateInput:
+      type: object
+      required: [username, password, role]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 32 }
+        display_name: { type: string, maxLength: 120 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+        role: { type: string, enum: [admin, author] }
+
+    AccountInput:
+      type: object
+      required: [display_name]
+      properties:
+        display_name: { type: string, maxLength: 120 }
+
+    PasswordChangeInput:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password: { type: string, maxLength: 256 }
+        new_password: { type: string, minLength: 8, maxLength: 72 }

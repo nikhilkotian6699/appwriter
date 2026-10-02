@@ -23,6 +23,7 @@ export const keys = {
   chapterHistory: (chapterId: string, kind?: string) => ["chapters", chapterId, "history", kind ?? "all"] as const,
   runCalls: (runId: string) => ["runs", runId, "calls"] as const,
   writerStats: (period: string, projectId?: string) => ["stats", "writers", period, projectId ?? "all"] as const,
+  users: ["users"] as const,
   chapterRevisions: (chapterId: string, status?: string) => ["chapters", chapterId, "revisions", status ?? "all"] as const,
   chapterRuns: (chapterId: string, kind?: string) => ["chapters", chapterId, "runs", kind ?? "all"] as const,
 };
@@ -196,4 +197,8 @@ export function useWriterStats(period: StatsPeriod, projectId?: string) {
     queryKey: keys.writerStats(period, projectId),
     queryFn: () => call(api.GET("/api/stats/writers", { params: { query: { period, project_id: projectId || undefined } } })),
   });
+}
+
+export function useUsers(enabled = true) {
+  return useQuery({ queryKey: keys.users, queryFn: () => call(api.GET("/api/users")), enabled });
 }
