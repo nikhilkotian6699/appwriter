@@ -315,6 +315,84 @@ paths:
               schema: { $ref: "#/components/schemas/Chapter" }
         default: { $ref: "#/components/responses/Error" }
 
+  /api/chapters/{chapterId}/runs:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+    get:
+      operationId: listChapterRuns
+      summary: Runs of a chapter, newest first
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/RunKind" }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Run" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/runs/{runId}:
+    parameters:
+      - $ref: "#/components/parameters/runId"
+    get:
+      operationId: getRun
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/runs/{runId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/runId"
+    post:
+      operationId: cancelRun
+      summary: Stop a running run; a finished run is returned unchanged
+      responses:
+        "200":
+          description: The run after the cancel request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/runs/{runId}/events:
+    parameters:
+      - $ref: "#/components/parameters/runId"
+    get:
+      operationId: streamRunEvents
+      summary: Follow a run as Server-Sent Events
+      description: |
+        Replays the stored events with a sequence number above `after` (or
+        the `Last-Event-ID` header), then follows the run live. Each event has
+        `id` set to its sequence number, `event` set to its type and `data`
+        holding the JSON payload. The stream ends after `run.finished`, or
+        after an `end` event when the run was already over; the browser then
+        closes the EventSource instead of reconnecting.
+      parameters:
+        - name: after
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: An event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        default: { $ref: "#/components/responses/Error" }
+
   /api/writers:
     get:
       operationId: listWriters
@@ -428,6 +506,11 @@ components:
       schema: { type: string, format: uuid }
     writerId:
       name: writerId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    runId:
+      name: runId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -701,3 +784,49 @@ components:
         cost_known: { type: boolean }
         cost_estimated: { type: boolean }
         latency_ms: { type: integer }
+
+    RunKind:
+      type: string
+      enum: [critique, revision, bible_update, cowrite, compare, writer_test]
+
+    RunStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, cancelled]
+
+    Run:
+      type: object
+      description: One workflow execution. params holds what started it, result what it produced.
+      required: [id, kind, status, params, error, cost_usd, cost_estimated, prompt_tokens, completion_tokens, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/RunKind" }
+        status: { $ref: "#/components/schemas/RunStatus" }
+        project_id: { type: string, format: uuid }
+        chapter_id: { type: string, format: uuid }
+        params:
+          type: object
+          additionalProperties: true
+        result:
+          type: object
+          additionalProperties: true
+        error: { type: string }
+        cost_usd: { type: number, format: double }
+        cost_estimated: { type: boolean }
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+
+    RunEvent:
+      type: object
+      description: One Server-Sent Event of a run, as stored. seq is the SSE id.
+      required: [run_id, seq, type, payload, created_at]
+      properties:
+        run_id: { type: string, format: uuid }
+        seq: { type: integer }
+        type: { type: string }
+        payload:
+          type: object
+          additionalProperties: true
+        created_at: { type: string, format: date-time }

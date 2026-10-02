@@ -37,3 +37,12 @@ INSERT INTO model_calls (user_id, run_id, writer_id, generation_name, model_alia
                          cost_usd, cost_estimated, latency_ms, status, error)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
+
+-- name: LastRunEventSeq :one
+SELECT coalesce(max(seq), 0)::integer FROM run_events WHERE run_id = $1;
+
+-- name: ListChapterRuns :many
+SELECT * FROM runs
+WHERE chapter_id = $1 AND user_id = $2 AND (sqlc.arg(kind)::text = '' OR kind = sqlc.arg(kind)::text)
+ORDER BY created_at DESC
+LIMIT sqlc.arg(row_limit);

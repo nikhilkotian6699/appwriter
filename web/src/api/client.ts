@@ -20,6 +20,10 @@ export type WriterTestInput = Schemas["WriterTestInput"];
 export type WriterTestResult = Schemas["WriterTestResult"];
 export type GatewayModels = Schemas["GatewayModels"];
 export type Settings = Schemas["Settings"];
+export type Run = Schemas["Run"];
+export type RunKind = Schemas["RunKind"];
+export type RunStatus = Schemas["RunStatus"];
+export type RunEvent = Schemas["RunEvent"];
 
 /** ApiError carries the server's stable error code alongside the message. */
 export class ApiError extends Error {

@@ -21,6 +21,7 @@ type Config struct {
 	AppUsername       string
 	AppPassword       string
 	LLMTimeout        time.Duration
+	RunTimeout        time.Duration
 	SessionSecret     string
 }
 
@@ -37,6 +38,7 @@ func Load() (Config, error) {
 		AppUsername:       strings.ToLower(strings.TrimSpace(os.Getenv("APP_USERNAME"))),
 		AppPassword:       os.Getenv("APP_PASSWORD"),
 		LLMTimeout:        time.Duration(envInt("LLM_TIMEOUT_SECONDS", 120)) * time.Second,
+		RunTimeout:        time.Duration(envInt("RUN_TIMEOUT_SECONDS", 900)) * time.Second,
 		SessionSecret:     os.Getenv("SESSION_SECRET"),
 	}
 	var errs []error

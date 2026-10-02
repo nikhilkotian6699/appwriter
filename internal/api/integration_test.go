@@ -30,6 +30,7 @@ type env struct {
 	q       *sqlcgen.Queries
 	mock    *llm.Mock
 	server  *Server
+	engine  *runs.Engine
 	handler http.Handler
 	user    sqlcgen.User
 }
@@ -42,11 +43,13 @@ func newEnv(t *testing.T) *env {
 	mock := llm.NewMock()
 	cfg := config.Config{AppName: "writersguild", DefaultModelAlias: "lumos-chat", LLMTimeout: 5 * time.Second}
 	tracker := runs.NewTracker(q, mock, cfg.AppName)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	engine := runs.NewEngine(tracker, q, 30*time.Second, logger)
 	g := guild.New(tracker, cfg.AppName)
-	srv := NewServer(cfg, pool, q, mock, g, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv := NewServer(cfg, pool, q, mock, g, engine, logger)
 	srv.SetUserResolver(func(r *http.Request) (sqlcgen.User, error) { return q.GetUserByID(r.Context(), user.ID) })
 	static := fstest.MapFS{"index.html": {Data: []byte("app")}}
-	return &env{t: t, q: q, mock: mock, server: srv, handler: NewRouter(srv, static, static), user: user}
+	return &env{t: t, q: q, mock: mock, server: srv, engine: engine, handler: NewRouter(srv, static, static), user: user}
 }
 
 // do performs a JSON request and decodes the reply into out when given.
@@ -387,4 +390,130 @@ func TestIntegrationIsolationSeed(t *testing.T) {
 	if len(list) != 0 {
 		t.Fatalf("b sees %d projects of a", len(list))
 	}
+}
+
+// TestIntegrationRuns covers the run endpoints: listing, fetching, following
+// a run as Server-Sent Events with replay, and cancelling.
+func TestIntegrationRuns(t *testing.T) {
+	e := newEnv(t)
+	var p Project
+	e.want(e.do("POST", "/api/projects", ProjectInput{Name: "Runs"}, &p), 201, "POST", "/api/projects")
+	var ch Chapter
+	e.want(e.do("POST", "/api/projects/"+p.Id.String()+"/chapters", ChapterCreateInput{Title: "One"}, &ch), 201, "POST", "chapters")
+
+	release := make(chan struct{})
+	run, err := e.engine.Launch(context.Background(), runs.StartParams{
+		User: e.user, ProjectID: uuid.NullUUID{UUID: p.Id, Valid: true}, ProjectName: p.Name,
+		ChapterID: uuid.NullUUID{UUID: ch.Id, Valid: true}, Kind: runs.KindCritique, Params: map[string]any{"writers": 2},
+	}, func(ctx context.Context, run *runs.Run, em *runs.Emitter) (any, error) {
+		_ = em.Emit(ctx, "writer.delta", map[string]string{"writer": "hemingway", "text": "The "})
+		<-release
+		_ = em.Emit(ctx, "writer.done", map[string]string{"writer": "hemingway"})
+		return map[string]int{"issues": 1}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got Run
+	e.want(e.do("GET", "/api/runs/"+run.Row.ID.String(), nil, &got), 200, "GET", "run")
+	if got.Status != "running" || got.Kind != "critique" || got.ChapterId == nil || *got.ChapterId != ch.Id {
+		t.Fatalf("run %+v", got)
+	}
+	var list []Run
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/runs?kind=critique", nil, &list), 200, "GET", "chapter runs")
+	if len(list) != 1 || list[0].Id != run.Row.ID {
+		t.Fatalf("chapter runs: %+v", list)
+	}
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/runs?kind=cowrite", nil, &list), 200, "GET", "chapter runs")
+	if len(list) != 0 {
+		t.Fatalf("cowrite runs: %+v", list)
+	}
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/runs?kind=bogus", nil, nil), 400, "GET", "chapter runs bad kind")
+
+	// Stream from seq 1 on: the replayed delta, then the live events.
+	streamDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest("GET", "/api/runs/"+run.Row.ID.String()+"/events", nil)
+		req.Header.Set("Last-Event-ID", "1")
+		rec := httptest.NewRecorder()
+		e.handler.ServeHTTP(rec, req)
+		streamDone <- rec
+	}()
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	var rec *httptest.ResponseRecorder
+	select {
+	case rec = <-streamDone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("event stream did not end")
+	}
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "text/event-stream" {
+		t.Fatalf("stream status %d type %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	body := rec.Body.String()
+	for _, want := range []string{"id: 2\nevent: writer.delta\n", "id: 3\nevent: writer.done\n", "id: 4\nevent: run.finished\n", `"status": "succeeded"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("stream missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "event: run.started") {
+		t.Fatalf("stream replayed seq 1 despite Last-Event-ID:\n%s", body)
+	}
+
+	// A finished run replays and ends with an explicit end event.
+	req := httptest.NewRequest("GET", "/api/runs/"+run.Row.ID.String()+"/events?after=4", nil)
+	rec = httptest.NewRecorder()
+	e.handler.ServeHTTP(rec, req)
+	if rec.Body.String() != "event: end\ndata: {}\n\n" {
+		t.Fatalf("finished stream: %q", rec.Body.String())
+	}
+	e.want(e.do("GET", "/api/runs/"+run.Row.ID.String(), nil, &got), 200, "GET", "run")
+	if got.Status != "succeeded" || got.Result == nil || (*got.Result)["issues"] != float64(1) {
+		t.Fatalf("finished run %+v", got)
+	}
+	// Cancelling a finished run changes nothing.
+	e.want(e.do("POST", "/api/runs/"+run.Row.ID.String()+"/cancel", nil, &got), 200, "POST", "cancel finished")
+	if got.Status != "succeeded" {
+		t.Fatalf("cancel changed a finished run to %q", got.Status)
+	}
+
+	// Cancel a running run through the API.
+	started := make(chan struct{})
+	slow, err := e.engine.Launch(context.Background(), runs.StartParams{User: e.user, Kind: runs.KindCowrite}, func(ctx context.Context, run *runs.Run, em *runs.Emitter) (any, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	e.want(e.do("POST", "/api/runs/"+slow.Row.ID.String()+"/cancel", nil, &got), 200, "POST", "cancel")
+	if got.Status != "cancelled" {
+		t.Fatalf("cancelled run has status %q", got.Status)
+	}
+
+	// A run interrupted by a restart (running in the database, not here) can be cancelled too.
+	orphan, err := e.engine.Tracker().Start(context.Background(), runs.StartParams{User: e.user, Kind: runs.KindCompare})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.want(e.do("POST", "/api/runs/"+orphan.Row.ID.String()+"/cancel", nil, &got), 200, "POST", "cancel orphan")
+	if got.Status != "cancelled" {
+		t.Fatalf("orphan run has status %q", got.Status)
+	}
+	req = httptest.NewRequest("GET", "/api/runs/"+orphan.Row.ID.String()+"/events", nil)
+	rec = httptest.NewRecorder()
+	e.handler.ServeHTTP(rec, req)
+	if rec.Body.String() != "event: end\ndata: {}\n\n" {
+		t.Fatalf("orphan stream: %q", rec.Body.String())
+	}
+
+	// Another account sees none of it.
+	other := newEnv(t)
+	other.want(other.do("GET", "/api/runs/"+run.Row.ID.String(), nil, nil), 404, "GET", "other's run")
+	other.want(other.do("POST", "/api/runs/"+run.Row.ID.String()+"/cancel", nil, nil), 404, "POST", "other's cancel")
+	other.want(other.do("GET", "/api/runs/"+run.Row.ID.String()+"/events", nil, nil), 404, "GET", "other's events")
+	other.want(other.do("GET", "/api/chapters/"+ch.Id.String()+"/runs", nil, nil), 404, "GET", "other's chapter runs")
 }

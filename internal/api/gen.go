@@ -4,6 +4,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -85,6 +86,63 @@ func (e ChapterVersionSummaryKind) Valid() bool {
 	case ChapterVersionSummaryKindPreRestore:
 		return true
 	case ChapterVersionSummaryKindPreRevision:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunKind.
+const (
+	BibleUpdate RunKind = "bible_update"
+	Compare     RunKind = "compare"
+	Cowrite     RunKind = "cowrite"
+	Critique    RunKind = "critique"
+	Revision    RunKind = "revision"
+	WriterTest  RunKind = "writer_test"
+)
+
+// Valid indicates whether the value is a known member of the RunKind enum.
+func (e RunKind) Valid() bool {
+	switch e {
+	case BibleUpdate:
+		return true
+	case Compare:
+		return true
+	case Cowrite:
+		return true
+	case Critique:
+		return true
+	case Revision:
+		return true
+	case WriterTest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RunStatus.
+const (
+	Cancelled RunStatus = "cancelled"
+	Failed    RunStatus = "failed"
+	Queued    RunStatus = "queued"
+	Running   RunStatus = "running"
+	Succeeded RunStatus = "succeeded"
+)
+
+// Valid indicates whether the value is a known member of the RunStatus enum.
+func (e RunStatus) Valid() bool {
+	switch e {
+	case Cancelled:
+		return true
+	case Failed:
+		return true
+	case Queued:
+		return true
+	case Running:
+		return true
+	case Succeeded:
 		return true
 	default:
 		return false
@@ -279,6 +337,40 @@ type ProjectSummary struct {
 	UpdatedAt    time.Time          `json:"updated_at"`
 }
 
+// Run One workflow execution. params holds what started it, result what it produced.
+type Run struct {
+	ChapterId        *openapi_types.UUID     `json:"chapter_id,omitempty"`
+	CompletionTokens int                     `json:"completion_tokens"`
+	CostEstimated    bool                    `json:"cost_estimated"`
+	CostUsd          float64                 `json:"cost_usd"`
+	CreatedAt        time.Time               `json:"created_at"`
+	Error            string                  `json:"error"`
+	FinishedAt       *time.Time              `json:"finished_at,omitempty"`
+	Id               openapi_types.UUID      `json:"id"`
+	Kind             RunKind                 `json:"kind"`
+	Params           map[string]interface{}  `json:"params"`
+	ProjectId        *openapi_types.UUID     `json:"project_id,omitempty"`
+	PromptTokens     int                     `json:"prompt_tokens"`
+	Result           *map[string]interface{} `json:"result,omitempty"`
+	StartedAt        *time.Time              `json:"started_at,omitempty"`
+	Status           RunStatus               `json:"status"`
+}
+
+// RunEvent One Server-Sent Event of a run, as stored. seq is the SSE id.
+type RunEvent struct {
+	CreatedAt time.Time              `json:"created_at"`
+	Payload   map[string]interface{} `json:"payload"`
+	RunId     openapi_types.UUID     `json:"run_id"`
+	Seq       int                    `json:"seq"`
+	Type      string                 `json:"type"`
+}
+
+// RunKind defines model for RunKind.
+type RunKind string
+
+// RunStatus defines model for RunStatus.
+type RunStatus string
+
 // Settings defines model for Settings.
 type Settings struct {
 	AutosaveSnapshotMinutes int `json:"autosave_snapshot_minutes"`
@@ -371,6 +463,9 @@ type EntryId = openapi_types.UUID
 // ProjectId defines model for projectId.
 type ProjectId = openapi_types.UUID
 
+// RunId defines model for runId.
+type RunId = openapi_types.UUID
+
 // VersionId defines model for versionId.
 type VersionId = openapi_types.UUID
 
@@ -379,6 +474,17 @@ type WriterId = openapi_types.UUID
 
 // Error defines model for Error.
 type Error = ErrorResponse
+
+// ListChapterRunsParams defines parameters for ListChapterRuns.
+type ListChapterRunsParams struct {
+	Kind  *RunKind `form:"kind,omitempty" json:"kind,omitempty"`
+	Limit *int     `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// StreamRunEventsParams defines parameters for StreamRunEvents.
+type StreamRunEventsParams struct {
+	After *int `form:"after,omitempty" json:"after,omitempty"`
+}
 
 // UpdateBibleEntryJSONRequestBody defines body for UpdateBibleEntry for application/json ContentType.
 type UpdateBibleEntryJSONRequestBody = BibleEntryInput
@@ -436,6 +542,9 @@ type ServerInterface interface {
 	// SaveChapterContent Save the chapter text; may create an autosave snapshot
 	// (PUT /api/chapters/{chapterId}/content)
 	SaveChapterContent(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
+	// ListChapterRuns Runs of a chapter, newest first
+	// (GET /api/chapters/{chapterId}/runs)
+	ListChapterRuns(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterRunsParams)
 
 	// (GET /api/chapters/{chapterId}/versions)
 	ListChapterVersions(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
@@ -481,6 +590,15 @@ type ServerInterface interface {
 
 	// (POST /api/projects/{projectId}/chapters)
 	CreateChapter(w http.ResponseWriter, r *http.Request, projectId ProjectId)
+
+	// (GET /api/runs/{runId})
+	GetRun(w http.ResponseWriter, r *http.Request, runId RunId)
+	// CancelRun Stop a running run; a finished run is returned unchanged
+	// (POST /api/runs/{runId}/cancel)
+	CancelRun(w http.ResponseWriter, r *http.Request, runId RunId)
+	// StreamRunEvents Follow a run as Server-Sent Events
+	// (GET /api/runs/{runId}/events)
+	StreamRunEvents(w http.ResponseWriter, r *http.Request, runId RunId, params StreamRunEventsParams)
 
 	// (GET /api/settings)
 	GetSettings(w http.ResponseWriter, r *http.Request)
@@ -543,6 +661,12 @@ func (_ Unimplemented) UpdateChapter(w http.ResponseWriter, r *http.Request, cha
 // SaveChapterContent Save the chapter text; may create an autosave snapshot
 // (PUT /api/chapters/{chapterId}/content)
 func (_ Unimplemented) SaveChapterContent(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListChapterRuns Runs of a chapter, newest first
+// (GET /api/chapters/{chapterId}/runs)
+func (_ Unimplemented) ListChapterRuns(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterRunsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -622,6 +746,23 @@ func (_ Unimplemented) ListChapters(w http.ResponseWriter, r *http.Request, proj
 
 // (POST /api/projects/{projectId}/chapters)
 func (_ Unimplemented) CreateChapter(w http.ResponseWriter, r *http.Request, projectId ProjectId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/runs/{runId})
+func (_ Unimplemented) GetRun(w http.ResponseWriter, r *http.Request, runId RunId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CancelRun Stop a running run; a finished run is returned unchanged
+// (POST /api/runs/{runId}/cancel)
+func (_ Unimplemented) CancelRun(w http.ResponseWriter, r *http.Request, runId RunId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// StreamRunEvents Follow a run as Server-Sent Events
+// (GET /api/runs/{runId}/events)
+func (_ Unimplemented) StreamRunEvents(w http.ResponseWriter, r *http.Request, runId RunId, params StreamRunEventsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -827,6 +968,61 @@ func (siw *ServerInterfaceWrapper) SaveChapterContent(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SaveChapterContent(w, r, chapterId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListChapterRuns operation middleware
+func (siw *ServerInterfaceWrapper) ListChapterRuns(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "chapterId" -------------
+	var chapterId ChapterId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "chapterId", chi.URLParam(r, "chapterId"), &chapterId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "chapterId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListChapterRunsParams
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListChapterRuns(w, r, chapterId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1196,6 +1392,100 @@ func (siw *ServerInterfaceWrapper) CreateChapter(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// GetRun operation middleware
+func (siw *ServerInterfaceWrapper) GetRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRun(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelRun operation middleware
+func (siw *ServerInterfaceWrapper) CancelRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelRun(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StreamRunEvents operation middleware
+func (siw *ServerInterfaceWrapper) StreamRunEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StreamRunEventsParams
+
+	// ------------- Optional query parameter "after" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "after", r.URL.Query(), &params.After, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "after"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "after", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StreamRunEvents(w, r, runId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSettings operation middleware
 func (siw *ServerInterfaceWrapper) GetSettings(w http.ResponseWriter, r *http.Request) {
 
@@ -1551,6 +1841,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/chapters/{chapterId}/versions/{versionId}/restore", wrapper.RestoreChapterVersion)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/chapters/{chapterId}/runs", wrapper.ListChapterRuns)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/runs/{runId}", wrapper.GetRun)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/runs/{runId}/cancel", wrapper.CancelRun)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/runs/{runId}/events", wrapper.StreamRunEvents)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/writers", wrapper.ListWriters)

@@ -269,6 +269,74 @@ func (q *Queries) GetRun(ctx context.Context, arg GetRunParams) (Run, error) {
 	return i, err
 }
 
+const lastRunEventSeq = `-- name: LastRunEventSeq :one
+SELECT coalesce(max(seq), 0)::integer FROM run_events WHERE run_id = $1
+`
+
+func (q *Queries) LastRunEventSeq(ctx context.Context, runID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, lastRunEventSeq, runID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const listChapterRuns = `-- name: ListChapterRuns :many
+SELECT id, user_id, project_id, chapter_id, kind, status, trace_id, params, result, error, cost_usd, cost_estimated, prompt_tokens, completion_tokens, created_at, started_at, finished_at FROM runs
+WHERE chapter_id = $1 AND user_id = $2 AND ($3::text = '' OR kind = $3::text)
+ORDER BY created_at DESC
+LIMIT $4
+`
+
+type ListChapterRunsParams struct {
+	ChapterID uuid.NullUUID
+	UserID    uuid.UUID
+	Kind      string
+	RowLimit  int32
+}
+
+func (q *Queries) ListChapterRuns(ctx context.Context, arg ListChapterRunsParams) ([]Run, error) {
+	rows, err := q.db.Query(ctx, listChapterRuns,
+		arg.ChapterID,
+		arg.UserID,
+		arg.Kind,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Run{}
+	for rows.Next() {
+		var i Run
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ProjectID,
+			&i.ChapterID,
+			&i.Kind,
+			&i.Status,
+			&i.TraceID,
+			&i.Params,
+			&i.Result,
+			&i.Error,
+			&i.CostUsd,
+			&i.CostEstimated,
+			&i.PromptTokens,
+			&i.CompletionTokens,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRunEvents = `-- name: ListRunEvents :many
 SELECT run_id, seq, type, payload, created_at FROM run_events WHERE run_id = $1 AND seq > $2 ORDER BY seq
 `

@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-02 · `develop` at `d9eb22a`
+Last updated: 2026-10-02 · `develop` at `6cd68b0`
 
 ## Milestones
 
@@ -34,7 +34,7 @@ branch is merged.
 |-----------|--------|------------|--------|
 | any | `feature/ci` | — | Not started |
 | any | `feature/guide-content` | — | Not started |
-| 2 | `feature/run-engine` | — | Not started |
+| 2 | `feature/run-engine` | — | Pushed (awaiting merge) |
 | 2 | `feature/text-tooling` | — | Not started |
 | 2 | `feature/structured-output` | text-tooling | Not started |
 | 2 | `feature/critique-workflow` | run-engine, structured-output | Not started |
@@ -60,8 +60,15 @@ Status values: Not started · In progress · Pushed (awaiting merge) · Merged.
 
 ## In progress
 
-Nothing. Next step: start Milestone 2 on `feature/run-engine`, with
-`feature/text-tooling` in parallel.
+Milestone 2, built as a stack of branches (each branched off the previous one
+and pushed; merge them to `develop` in the order run-engine, text-tooling,
+structured-output, critique-workflow, critique-ui). One commit per branch,
+messages `M2: <title> (n/5)`.
+
+- `feature/run-engine` is done and pushed: background engine, numbered
+  `run_events`, SSE replay with `Last-Event-ID`, cancel, chapter run list,
+  `RUN_TIMEOUT_SECONDS`.
+- Next: `feature/text-tooling`.
 
 ## Open items
 

@@ -442,7 +442,7 @@ func gatewayError(resp *http.Response) error {
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	msg := strings.TrimSpace(string(raw))
 	var parsed struct {
-		Error any `json:"error"`
+		Error  any `json:"error"`
 		Detail any `json:"detail"`
 	}
 	if json.Unmarshal(raw, &parsed) == nil {

@@ -58,6 +58,7 @@ database; changing the variable does nothing until you run the reset flag
 | `DATABASE_URL` | outside compose | Full connection string when running the binary yourself. |
 | `PORT` | no (8080) | HTTP port. |
 | `LLM_TIMEOUT_SECONDS` | no (120) | Per-request timeout for writer tests and single calls. |
+| `RUN_TIMEOUT_SECONDS` | no (900) | Upper bound for one whole background run (a critique with all its writers, a revision, …). |
 | `TEST_DATABASE_URL` | tests only | Integration tests run only when set. |
 
 ## Model aliases
@@ -126,6 +127,22 @@ The HTTP contract is `api/openapi.yaml`; both the Go server interface and the
 TypeScript client are generated from it. Schema changes are goose migrations
 under `internal/db/migrations`, queries are sqlc files under
 `internal/db/queries`.
+
+### Runs and event streams
+
+Every workflow is a run (`runs` table) executed in the background by the run
+engine (`internal/runs`), so it survives the browser tab that started it. As a
+run proceeds it appends numbered events (`run_events`); the browser follows
+them at `GET /api/runs/{id}/events` as Server-Sent Events. Each event carries
+`id` (the sequence number), `event` (the type) and a JSON `data` payload. A
+reconnecting browser sends `Last-Event-ID` (or `?after=`) and receives only
+what it missed, first from the database and then live. The stream closes
+after `run.finished`; a run that was already over replays and ends with an
+`end` event, which tells the browser not to reconnect.
+
+`POST /api/runs/{id}/cancel` stops a run; `GET /api/chapters/{id}/runs?kind=`
+lists a chapter's runs, newest first. Runs left running by a crash are marked
+failed at the next start.
 
 The fake gateway (`cmd/fakegateway`) speaks the same API as LiteLLM with
 canned replies, usage, a cost header and streaming. Any model id containing

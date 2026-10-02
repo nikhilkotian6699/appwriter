@@ -238,6 +238,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chapters/{chapterId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        /** Runs of a chapter, newest first */
+        get: operations["listChapterRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        get: operations["getRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a running run; a finished run is returned unchanged */
+        post: operations["cancelRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Follow a run as Server-Sent Events
+         * @description Replays the stored events with a sequence number above `after` (or
+         *     the `Last-Event-ID` header), then follows the run live. Each event has
+         *     `id` set to its sequence number, `event` set to its type and `data`
+         *     holding the JSON payload. The stream ends after `run.finished`, or
+         *     after an `end` event when the run was already over; the browser then
+         *     closes the EventSource instead of reconnecting.
+         */
+        get: operations["streamRunEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/writers": {
         parameters: {
             query?: never;
@@ -521,6 +604,51 @@ export interface components {
             cost_estimated: boolean;
             latency_ms: number;
         };
+        /** @enum {string} */
+        RunKind: "critique" | "revision" | "bible_update" | "cowrite" | "compare" | "writer_test";
+        /** @enum {string} */
+        RunStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+        /** @description One workflow execution. params holds what started it, result what it produced. */
+        Run: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["RunKind"];
+            status: components["schemas"]["RunStatus"];
+            /** Format: uuid */
+            project_id?: string;
+            /** Format: uuid */
+            chapter_id?: string;
+            params: {
+                [key: string]: unknown;
+            };
+            result?: {
+                [key: string]: unknown;
+            };
+            error: string;
+            /** Format: double */
+            cost_usd: number;
+            cost_estimated: boolean;
+            prompt_tokens: number;
+            completion_tokens: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            finished_at?: string;
+        };
+        /** @description One Server-Sent Event of a run, as stored. seq is the SSE id. */
+        RunEvent: {
+            /** Format: uuid */
+            run_id: string;
+            seq: number;
+            type: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+        };
     };
     responses: {
         /** @description Error */
@@ -539,6 +667,7 @@ export interface components {
         versionId: string;
         entryId: string;
         writerId: string;
+        runId: string;
     };
     requestBodies: never;
     headers: never;
@@ -1099,6 +1228,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Chapter"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listChapterRuns: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["RunKind"];
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    cancelRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run after the cancel request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    streamRunEvents: {
+        parameters: {
+            query?: {
+                after?: number;
+            };
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An event stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
                 };
             };
             default: components["responses"]["Error"];

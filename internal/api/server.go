@@ -18,16 +18,18 @@ import (
 	"writersguild/internal/db/sqlcgen"
 	"writersguild/internal/guild"
 	"writersguild/internal/llm"
+	"writersguild/internal/runs"
 )
 
 // Server implements the generated ServerInterface.
 type Server struct {
-	cfg   config.Config
-	pool  *pgxpool.Pool
-	q     *sqlcgen.Queries
-	llm   llm.Client
-	guild *guild.Guild
-	log   *slog.Logger
+	cfg    config.Config
+	pool   *pgxpool.Pool
+	q      *sqlcgen.Queries
+	llm    llm.Client
+	guild  *guild.Guild
+	engine *runs.Engine
+	log    *slog.Logger
 	// resolveUser returns the account making the request. Until milestone 7
 	// this is the single bootstrap account.
 	resolveUser func(r *http.Request) (sqlcgen.User, error)
@@ -36,8 +38,8 @@ type Server struct {
 var _ ServerInterface = (*Server)(nil)
 
 // NewServer wires a Server.
-func NewServer(cfg config.Config, pool *pgxpool.Pool, q *sqlcgen.Queries, client llm.Client, g *guild.Guild, log *slog.Logger) *Server {
-	s := &Server{cfg: cfg, pool: pool, q: q, llm: client, guild: g, log: log}
+func NewServer(cfg config.Config, pool *pgxpool.Pool, q *sqlcgen.Queries, client llm.Client, g *guild.Guild, engine *runs.Engine, log *slog.Logger) *Server {
+	s := &Server{cfg: cfg, pool: pool, q: q, llm: client, guild: g, engine: engine, log: log}
 	s.resolveUser = s.singleUser
 	return s
 }

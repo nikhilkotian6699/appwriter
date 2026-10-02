@@ -74,8 +74,9 @@ func run(log *slog.Logger, resetAdmin, healthcheck bool) error {
 
 	client := llm.NewLiteLLM(cfg.LiteLLMBaseURL, cfg.LiteLLMAPIKey)
 	tracker := runs.NewTracker(q, client, cfg.AppName)
+	engine := runs.NewEngine(tracker, q, cfg.RunTimeout, log)
 	g := guildpkg.New(tracker, cfg.AppName)
-	server := api.NewServer(cfg, pool, q, client, g, log)
+	server := api.NewServer(cfg, pool, q, client, g, engine, log)
 
 	webFS, err := fs.Sub(web.Dist, "dist")
 	if err != nil {
@@ -106,7 +107,11 @@ func run(log *slog.Logger, resetAdmin, healthcheck bool) error {
 		log.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		return srv.Shutdown(shutdownCtx)
+		err := srv.Shutdown(shutdownCtx)
+		if eerr := engine.Shutdown(shutdownCtx); eerr != nil {
+			log.Warn("runs still active at shutdown; they are marked failed at the next start", "err", eerr)
+		}
+		return err
 	}
 }
 

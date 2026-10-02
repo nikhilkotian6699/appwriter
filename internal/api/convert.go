@@ -45,6 +45,37 @@ func toVersionSummary(v sqlcgen.ListChapterVersionsRow) ChapterVersionSummary {
 	return ChapterVersionSummary{Id: v.ID, ChapterId: v.ChapterID, Kind: ChapterVersionSummaryKind(v.Kind), Label: v.Label, ContentHash: v.ContentHash, ContentLength: int(v.ContentLength), CreatedAt: v.CreatedAt}
 }
 
+func toRun(r sqlcgen.Run) Run {
+	out := Run{
+		Id: r.ID, Kind: RunKind(r.Kind), Status: RunStatus(r.Status), Params: decodeObject(r.Params), Error: r.Error,
+		CostUsd: r.CostUsd, CostEstimated: r.CostEstimated, PromptTokens: int(r.PromptTokens), CompletionTokens: int(r.CompletionTokens),
+		CreatedAt: r.CreatedAt, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt,
+	}
+	if r.ProjectID.Valid {
+		out.ProjectId = ptr(r.ProjectID.UUID)
+	}
+	if r.ChapterID.Valid {
+		out.ChapterId = ptr(r.ChapterID.UUID)
+	}
+	if len(r.Result) > 0 && string(r.Result) != "null" {
+		out.Result = ptr(decodeObject(r.Result))
+	}
+	return out
+}
+
+// decodeObject turns stored JSON into a map; anything unexpected becomes {}.
+func decodeObject(raw []byte) map[string]any {
+	out := map[string]any{}
+	if len(raw) == 0 {
+		return out
+	}
+	_ = json.Unmarshal(raw, &out)
+	if out == nil {
+		out = map[string]any{}
+	}
+	return out
+}
+
 func toBibleEntry(e sqlcgen.BibleEntry) BibleEntry {
 	out := BibleEntry{Id: e.ID, ProjectId: e.ProjectID, Section: BibleSection(e.Section), Title: e.Title, Fields: decodeFields(e.Fields), Position: int(e.Position), CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt}
 	if e.ChapterID.Valid {
