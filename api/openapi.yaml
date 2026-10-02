@@ -703,6 +703,54 @@ paths:
               schema: { $ref: "#/components/schemas/Draft" }
         default: { $ref: "#/components/responses/Error" }
 
+  /api/chapters/{chapterId}/history:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+    get:
+      operationId: getChapterHistory
+      summary: Every run of a chapter, newest first, with totals
+      description: |
+        Runs with a one-line summary each and the counts behind it (critics,
+        issues and decisions, revision changes, drafts, proposals), the
+        totals of runs, cost and tokens over every run matching `kind`, and
+        per-kind counts for the filter. Page through with `before`.
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/RunKind" }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+        - name: before
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HistoryPage" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/runs/{runId}/calls:
+    parameters:
+      - $ref: "#/components/parameters/runId"
+    get:
+      operationId: listRunCalls
+      summary: The gateway calls a run made, with cost and tokens per writer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ModelCall" }
+        default: { $ref: "#/components/responses/Error" }
+
   /api/runs/{runId}:
     parameters:
       - $ref: "#/components/parameters/runId"
@@ -1551,3 +1599,109 @@ components:
       required: [decision]
       properties:
         decision: { $ref: "#/components/schemas/DraftDecision" }
+
+    HistoryTotals:
+      type: object
+      required: [runs, cost_usd, cost_estimated, prompt_tokens, completion_tokens]
+      properties:
+        runs: { type: integer }
+        cost_usd: { type: number, format: double }
+        cost_estimated: { type: boolean, description: True when any part of the cost was estimated from token counts }
+        prompt_tokens: { type: integer, format: int64 }
+        completion_tokens: { type: integer, format: int64 }
+
+    HistoryKindCount:
+      type: object
+      required: [kind, count]
+      properties:
+        kind: { $ref: "#/components/schemas/RunKind" }
+        count: { type: integer }
+
+    CritiqueSummary:
+      type: object
+      required: [critics, failed, issues, accepted, rejected, pending, synthesis]
+      properties:
+        critics: { type: integer }
+        failed: { type: integer }
+        issues: { type: integer }
+        accepted: { type: integer }
+        rejected: { type: integer }
+        pending: { type: integer }
+        synthesis: { type: string, description: ok, fallback or skipped }
+
+    RevisionSummary:
+      type: object
+      required: [status, hunks, applied_hunks, words_added, words_removed]
+      properties:
+        status: { $ref: "#/components/schemas/RevisionStatus" }
+        hunks: { type: integer }
+        applied_hunks: { type: integer }
+        words_added: { type: integer }
+        words_removed: { type: integer }
+
+    DraftsSummary:
+      type: object
+      required: [count, inserted, replaced, discarded, pending]
+      properties:
+        count: { type: integer }
+        inserted: { type: integer }
+        replaced: { type: integer }
+        discarded: { type: integer }
+        pending: { type: integer }
+
+    BibleSummary:
+      type: object
+      required: [proposals, approved, rejected, pending]
+      properties:
+        proposals: { type: integer }
+        approved: { type: integer }
+        rejected: { type: integer }
+        pending: { type: integer }
+
+    RunHistoryItem:
+      type: object
+      required: [run, summary, writers, model_calls]
+      properties:
+        run: { $ref: "#/components/schemas/Run" }
+        summary: { type: string, description: One line saying what the run did and what came of it }
+        writers:
+          type: array
+          items: { type: string }
+        model_calls: { type: integer }
+        critique: { $ref: "#/components/schemas/CritiqueSummary" }
+        revision: { $ref: "#/components/schemas/RevisionSummary" }
+        drafts: { $ref: "#/components/schemas/DraftsSummary" }
+        bible: { $ref: "#/components/schemas/BibleSummary" }
+
+    HistoryPage:
+      type: object
+      required: [items, totals, kinds]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/RunHistoryItem" }
+        totals: { $ref: "#/components/schemas/HistoryTotals" }
+        kinds:
+          type: array
+          items: { $ref: "#/components/schemas/HistoryKindCount" }
+        next_before: { type: string, format: date-time, description: Pass as `before` to get the next page; absent on the last page }
+
+    ModelCall:
+      type: object
+      description: One request to the gateway, as recorded.
+      required: [id, generation_name, model_alias, prompt_tokens, completion_tokens, cost_usd, cost_estimated, latency_ms, status, error, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        writer_id: { type: string, format: uuid }
+        writer_name: { type: string }
+        generation_name: { type: string }
+        model_alias: { type: string }
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        cost_usd: { type: number, format: double }
+        cost_estimated: { type: boolean }
+        latency_ms: { type: integer }
+        status: { type: string, enum: [ok, error] }
+        error: { type: string }
+        created_at: { type: string, format: date-time }

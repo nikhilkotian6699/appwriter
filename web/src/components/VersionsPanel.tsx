@@ -47,7 +47,7 @@ export function VersionsPanel({ chapterId, onRestored }: Props) {
   return (
     <aside className="rounded-lg border border-stone-200 bg-white shadow-sm">
       <div className="border-b border-stone-200 px-4 py-3">
-        <h2 className="font-semibold text-stone-900">History</h2>
+        <h2 className="font-semibold text-stone-900">Versions</h2>
         <p className="mt-1 text-xs text-stone-500">Autosave keeps a snapshot at most every few minutes; take one by hand before a big change.</p>
         <form
           className="mt-3 flex gap-2"

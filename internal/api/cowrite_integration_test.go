@@ -167,6 +167,25 @@ func TestIntegrationCowrite(t *testing.T) {
 		t.Fatalf("compare decisions %s %s %s", drafts[0].Decision, drafts[1].Decision, drafts[2].Decision)
 	}
 
+	// History shows the drafts: one co-write run per request, the compare run with its three drafts.
+	var hist HistoryPage
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/history?kind=compare", nil, &hist), 200, "GET", "history compare")
+	if len(hist.Items) != 1 || hist.Items[0].Drafts == nil || hist.Items[0].Drafts.Count != 3 || hist.Items[0].Drafts.Replaced != 1 || hist.Items[0].Drafts.Discarded != 1 || !strings.Contains(hist.Items[0].Summary, "3 drafts compared") {
+		t.Fatalf("compare history %+v", hist.Items)
+	}
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/history?kind=cowrite", nil, &hist), 200, "GET", "history cowrite")
+	if hist.Totals.Runs != 3 || len(hist.Items) != 3 {
+		t.Fatalf("cowrite history %+v", hist.Totals)
+	}
+	for _, it := range hist.Items {
+		if it.Run.Status == "failed" && !strings.HasPrefix(it.Summary, "Failed:") {
+			t.Fatalf("failed run summary %q", it.Summary)
+		}
+		if it.Run.Status == "succeeded" && (it.Drafts == nil || it.Drafts.Count != 1 || !strings.Contains(it.Summary, "“")) {
+			t.Fatalf("cowrite summary %+v", it)
+		}
+	}
+
 	other := newEnv(t)
 	other.want(other.do("POST", "/api/chapters/"+ch.Id.String()+"/drafts", CowriteStartInput{WriterIds: []uuid.UUID{hem.Id}, Instruction: "Go."}, nil), 404, "POST", "other's chapter")
 	other.want(other.do("GET", "/api/runs/"+run.Id.String()+"/drafts", nil, nil), 404, "GET", "other's drafts")

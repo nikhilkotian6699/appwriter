@@ -187,6 +187,21 @@ in parallel and sit side by side in the Guild panel, each with its own
 Insert, Replace, Discard and Take back; one writer failing does not spoil
 the others.
 
+### History and cost
+
+`GET /api/chapters/{id}/history` lists every run of a chapter, newest first,
+each with a one-line summary and the counts behind it (critics and issues
+with their decisions, revision changes and how many were applied, drafts and
+what became of them, story bible proposals and their fate), plus totals of
+runs, cost and tokens over every run matching the `kind` filter and per-kind
+counts for the filter chips; page with `before`. `GET /api/runs/{id}/calls`
+lists the gateway calls a run made with tokens, cost and latency per writer,
+so cost per run breaks down per writer. Cost comes from the gateway's
+`x-litellm-response-cost` header; streamed replies carry none, so their cost
+is estimated from token counts and `GET /model/info` prices and shown with
+"est." wherever it appears. In the app, "History" on a chapter opens the page
+(the snapshot panel is "Versions").
+
 ### Runs and event streams
 
 Every workflow is a run (`runs` table) executed in the background by the run

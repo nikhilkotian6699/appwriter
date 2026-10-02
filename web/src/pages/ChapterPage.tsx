@@ -338,9 +338,12 @@ function ChapterWorkspace({ initial }: { initial: Chapter }) {
               Reload server version
             </Button>
           )}
-          <Button size="sm" onClick={() => setPanel((p) => (p === "history" ? null : "history"))} aria-pressed={panel === "history"}>
-            History
+          <Button size="sm" onClick={() => setPanel((p) => (p === "history" ? null : "history"))} aria-pressed={panel === "history"} title="Snapshots of the text">
+            Versions
           </Button>
+          <Link to={`/chapters/${chapterId}/history`} className="inline-flex items-center rounded-md border border-stone-300 bg-white px-2.5 py-1 text-xs font-medium text-stone-800 hover:bg-stone-100" title="Every run of this chapter, with cost and tokens">
+            History
+          </Link>
           {(activeRunId || cowriteRunId) && (
             <Button size="sm" onClick={() => setPanel((p) => (p === "guild" ? null : "guild"))} aria-pressed={panel === "guild"}>
               Guild

@@ -501,6 +501,85 @@ func TestIntegrationCritiqueWorkflow(t *testing.T) {
 	if len(pending) != 0 {
 		t.Fatalf("pending after decisions %d", len(pending))
 	}
+	// History: every run of the chapter, newest first, with summaries and totals.
+	var hist HistoryPage
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/history", nil, &hist), 200, "GET", "history")
+	// At this point: the critique, the applied revision and the bible update it started.
+	if hist.Totals.Runs != 3 || hist.Totals.CostUsd <= 0 || !hist.Totals.CostEstimated || hist.Totals.PromptTokens <= 0 || len(hist.Items) != hist.Totals.Runs {
+		t.Fatalf("history totals %+v items %d", hist.Totals, len(hist.Items))
+	}
+	for i := 1; i < len(hist.Items); i++ {
+		if hist.Items[i].Run.CreatedAt.After(hist.Items[i-1].Run.CreatedAt) {
+			t.Fatal("history is not newest first")
+		}
+	}
+	byKind := map[string]int{}
+	for _, k := range hist.Kinds {
+		byKind[string(k.Kind)] = k.Count
+	}
+	if byKind["critique"] != 1 || byKind["revision"] != 1 || byKind["bible_update"] != 1 {
+		t.Fatalf("history kinds %v", byKind)
+	}
+	var critItem, revItem, bibleItem *RunHistoryItem
+	for i := range hist.Items {
+		it := &hist.Items[i]
+		switch {
+		case it.Run.Id == critiqueRun.Id:
+			critItem = it
+		case it.Run.Kind == "revision" && it.Revision != nil && it.Revision.Status == "applied":
+			revItem = it
+		case it.Run.Kind == "bible_update":
+			bibleItem = it
+		}
+	}
+	if critItem == nil || critItem.Critique == nil || critItem.Critique.Critics != 3 || critItem.Critique.Failed != 1 || critItem.Critique.Issues != 4 || critItem.Critique.Accepted != 1 || critItem.Critique.Rejected != 1 || critItem.Critique.Pending != 2 || critItem.Critique.Synthesis != "ok" {
+		t.Fatalf("critique history item %+v", critItem)
+	}
+	if !strings.Contains(critItem.Summary, "3 critics") || !strings.Contains(critItem.Summary, "4 issues") || !strings.Contains(critItem.Summary, "1 accepted") || len(critItem.Writers) < 3 || critItem.ModelCalls < 4 {
+		t.Fatalf("critique summary %q writers %v calls %d", critItem.Summary, critItem.Writers, critItem.ModelCalls)
+	}
+	if revItem == nil || revItem.Revision.Hunks != 1 || revItem.Revision.AppliedHunks != 1 || revItem.Revision.WordsRemoved != 1 || !strings.Contains(revItem.Summary, "1 applied") || !strings.Contains(strings.Join(revItem.Writers, ","), "Lead writer") {
+		t.Fatalf("revision history item %+v", revItem)
+	}
+	if bibleItem == nil || bibleItem.Bible == nil || bibleItem.Bible.Proposals != 2 || bibleItem.Bible.Approved != 1 || bibleItem.Bible.Rejected != 1 || !strings.Contains(bibleItem.Summary, "2 proposals") {
+		t.Fatalf("bible history item %+v", bibleItem)
+	}
+	// Filter by kind, and page with before.
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/history?kind=revision", nil, &hist), 200, "GET", "history revisions")
+	if hist.Totals.Runs != 1 || len(hist.Items) != 1 || hist.Items[0].Run.Kind != "revision" {
+		t.Fatalf("filtered history %+v", hist.Totals)
+	}
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/history?limit=2", nil, &hist), 200, "GET", "history page 1")
+	if len(hist.Items) != 2 || hist.NextBefore == nil {
+		t.Fatalf("page 1 %+v", hist)
+	}
+	var page2 HistoryPage
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/history?limit=2&before="+hist.NextBefore.UTC().Format("2006-01-02T15:04:05.999999Z07:00"), nil, &page2), 200, "GET", "history page 2")
+	if len(page2.Items) != 1 || page2.Items[0].Run.Id == hist.Items[0].Run.Id || page2.Items[0].Run.Id == hist.Items[1].Run.Id || !page2.Items[0].Run.CreatedAt.Before(*hist.NextBefore) || page2.NextBefore != nil {
+		t.Fatalf("page 2 %+v", page2.Items)
+	}
+	e.want(e.do("GET", "/api/chapters/"+ch.Id.String()+"/history?kind=bogus", nil, nil), 400, "GET", "history bad kind")
+	// The calls behind a run, with cost per writer.
+	var calls []ModelCall
+	e.want(e.do("GET", "/api/runs/"+critiqueRun.Id.String()+"/calls", nil, &calls), 200, "GET", "run calls")
+	if len(calls) < 4 {
+		t.Fatalf("calls %d", len(calls))
+	}
+	seenEditor, seenError := false, false
+	for _, c := range calls {
+		if c.GenerationName == "editor-in-chief" && c.WriterName != nil && *c.WriterName == "Editor-in-chief" && c.CostUsd > 0 {
+			seenEditor = true
+		}
+		if c.Status == "error" && strings.Contains(c.Error, "500") {
+			seenError = true
+		}
+	}
+	if !seenEditor || !seenError {
+		t.Fatalf("calls should include the editor's call and the failed critic's call: %+v", calls)
+	}
+	other.want(other.do("GET", "/api/chapters/"+ch.Id.String()+"/history", nil, nil), 404, "GET", "other's history")
+	other.want(other.do("GET", "/api/runs/"+critiqueRun.Id.String()+"/calls", nil, nil), 404, "GET", "other's calls")
+
 	// A bible update can also be asked for by hand, naming an applied revision.
 	var manual Run
 	e.want(e.do("POST", "/api/chapters/"+ch.Id.String()+"/bible-updates", BibleUpdateStartInput{RevisionId: ptr(applied.Revision.Id)}, &manual), 202, "POST", "manual bible update")

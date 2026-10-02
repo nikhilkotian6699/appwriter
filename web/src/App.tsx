@@ -6,6 +6,7 @@ import ChapterPage from "./pages/ChapterPage";
 import BiblePage from "./pages/BiblePage";
 import WritersPage from "./pages/WritersPage";
 import SettingsPage from "./pages/SettingsPage";
+import HistoryPage from "./pages/HistoryPage";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/projects/:projectId" element={<ProjectPage />} />
         <Route path="/projects/:projectId/bible" element={<BiblePage />} />
         <Route path="/chapters/:chapterId" element={<ChapterPage />} />
+        <Route path="/chapters/:chapterId/history" element={<HistoryPage />} />
         <Route path="/writers" element={<WritersPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<div className="p-8 text-stone-600">There is nothing at this address.</div>} />

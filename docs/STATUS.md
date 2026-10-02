@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M5 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-03 (M6 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -18,7 +18,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 3 | Editor-in-chief synthesis, issue list, accept/reject | Built on 2 feature branches, awaiting merge | see branches |
 | 4 | Revision with diff and hunks, bible-keeper proposals | Built on 3 feature branches, awaiting merge | see branches |
 | 5 | Co-writing workflow and compare mode | Built on 2 feature branches, awaiting merge | see branches |
-| 6 | Run history, cost and writer stats, settings page | Next | |
+| 6 | Run history, cost and writer stats, settings page | In progress (run-history pushed; writer-stats next) | |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Not started | |
 | 8 | Account management: usage per user, roles, passwords, disable, delete | Not started | |
 | 9 | In-app guide for new users | Not started | |
@@ -46,7 +46,7 @@ branch is merged.
 | 4 | `feature/bible-keeper` | revision-workflow | Pushed (awaiting merge) |
 | 5 | `feature/cowrite` | run-engine | Pushed (awaiting merge) |
 | 5 | `feature/compare-mode` | cowrite | Pushed (awaiting merge) |
-| 6 | `feature/run-history` | — | Not started |
+| 6 | `feature/run-history` | — | Pushed (awaiting merge) |
 | 6 | `feature/writer-stats` | — | Not started |
 | 7 | `feature/auth-lib` | — | Not started |
 | 7 | `feature/login` | auth-lib | Not started |
@@ -162,8 +162,19 @@ merged, origin did not show it yet when work started):
   writer.
 
 Milestone 5 is complete pending merge (order: cowrite, compare-mode) and the
-live gateway check. Next: Milestone 6 on `feature/run-history` and
-`feature/writer-stats`.
+live gateway check.
+
+Milestone 6 (stacked on `feature/compare-mode`; origin still showed no merges
+when work started):
+
+- `feature/run-history` is done and pushed: GET /api/chapters/{id}/history
+  (runs newest first with per-kind summaries and counts, totals, kind
+  counts, `before` paging), GET /api/runs/{id}/calls (gateway calls with cost
+  per writer), History page at /chapters/{id}/history with totals, kind
+  filter chips, expandable call tables and "Load older runs"; the chapter's
+  snapshot panel is now called Versions; integration coverage in the critique
+  and co-write tests.
+- Next: `feature/writer-stats`.
 
 ## Open items
 

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { api, call } from "./client";
 
 export const keys = {
@@ -20,6 +20,8 @@ export const keys = {
   runProposals: (runId: string) => ["runs", runId, "proposals"] as const,
   runDrafts: (runId: string) => ["runs", runId, "drafts"] as const,
   chapterDrafts: (chapterId: string) => ["chapters", chapterId, "drafts"] as const,
+  chapterHistory: (chapterId: string, kind?: string) => ["chapters", chapterId, "history", kind ?? "all"] as const,
+  runCalls: (runId: string) => ["runs", runId, "calls"] as const,
   chapterRevisions: (chapterId: string, status?: string) => ["chapters", chapterId, "revisions", status ?? "all"] as const,
   chapterRuns: (chapterId: string, kind?: string) => ["chapters", chapterId, "runs", kind ?? "all"] as const,
 };
@@ -158,5 +160,25 @@ export function useChapterDrafts(chapterId: string, limit = 10) {
   return useQuery({
     queryKey: keys.chapterDrafts(chapterId),
     queryFn: () => call(api.GET("/api/chapters/{chapterId}/drafts", { params: { path: { chapterId }, query: { limit } } })),
+  });
+}
+
+export type HistoryKind = "critique" | "revision" | "bible_update" | "cowrite" | "compare" | "writer_test";
+
+export function useChapterHistory(chapterId: string, kind?: HistoryKind, limit = 30) {
+  return useInfiniteQuery({
+    queryKey: keys.chapterHistory(chapterId, kind),
+    queryFn: ({ pageParam }) =>
+      call(api.GET("/api/chapters/{chapterId}/history", { params: { path: { chapterId }, query: { kind, limit, before: pageParam || undefined } } })),
+    initialPageParam: "" as string,
+    getNextPageParam: (last) => last.next_before ?? undefined,
+  });
+}
+
+export function useRunCalls(runId: string | null) {
+  return useQuery({
+    queryKey: keys.runCalls(runId ?? ""),
+    queryFn: () => call(api.GET("/api/runs/{runId}/calls", { params: { path: { runId: runId! } } })),
+    enabled: !!runId,
   });
 }

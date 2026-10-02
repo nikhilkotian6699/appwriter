@@ -263,6 +263,24 @@ func (e IssueSeverity) Valid() bool {
 	}
 }
 
+// Defines values for ModelCallStatus.
+const (
+	ModelCallStatusError ModelCallStatus = "error"
+	ModelCallStatusOk    ModelCallStatus = "ok"
+)
+
+// Valid indicates whether the value is a known member of the ModelCallStatus enum.
+func (e ModelCallStatus) Valid() bool {
+	switch e {
+	case ModelCallStatusError:
+		return true
+	case ModelCallStatusOk:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProposalAction.
 const (
 	ProposalActionAdd    ProposalAction = "add"
@@ -485,6 +503,14 @@ type BibleProposalDecisionInputDecision string
 // BibleSection defines model for BibleSection.
 type BibleSection string
 
+// BibleSummary defines model for BibleSummary.
+type BibleSummary struct {
+	Approved  int `json:"approved"`
+	Pending   int `json:"pending"`
+	Proposals int `json:"proposals"`
+	Rejected  int `json:"rejected"`
+}
+
 // BibleUpdateStartInput defines model for BibleUpdateStartInput.
 type BibleUpdateStartInput struct {
 	// RevisionId The applied revision whose changes the keeper should consider
@@ -643,6 +669,19 @@ type CritiqueStartInput struct {
 // CritiqueStatus defines model for CritiqueStatus.
 type CritiqueStatus string
 
+// CritiqueSummary defines model for CritiqueSummary.
+type CritiqueSummary struct {
+	Accepted int `json:"accepted"`
+	Critics  int `json:"critics"`
+	Failed   int `json:"failed"`
+	Issues   int `json:"issues"`
+	Pending  int `json:"pending"`
+	Rejected int `json:"rejected"`
+
+	// Synthesis ok
+	Synthesis string `json:"synthesis"`
+}
+
 // DiffHunk One region of change; offsets address the chapter text the revision was computed against.
 type DiffHunk struct {
 	ContextAfter  string   `json:"context_after"`
@@ -716,6 +755,15 @@ type DraftMode string
 // DraftStatus defines model for DraftStatus.
 type DraftStatus string
 
+// DraftsSummary defines model for DraftsSummary.
+type DraftsSummary struct {
+	Count     int `json:"count"`
+	Discarded int `json:"discarded"`
+	Inserted  int `json:"inserted"`
+	Pending   int `json:"pending"`
+	Replaced  int `json:"replaced"`
+}
+
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
 	Error struct {
@@ -731,6 +779,33 @@ type GatewayModels struct {
 	// Aliases Models whose id starts with the alias prefix
 	Aliases   []string `json:"aliases"`
 	AllModels []string `json:"all_models"`
+}
+
+// HistoryKindCount defines model for HistoryKindCount.
+type HistoryKindCount struct {
+	Count int     `json:"count"`
+	Kind  RunKind `json:"kind"`
+}
+
+// HistoryPage defines model for HistoryPage.
+type HistoryPage struct {
+	Items []RunHistoryItem   `json:"items"`
+	Kinds []HistoryKindCount `json:"kinds"`
+
+	// NextBefore Pass as `before` to get the next page; absent on the last page
+	NextBefore *time.Time    `json:"next_before,omitempty"`
+	Totals     HistoryTotals `json:"totals"`
+}
+
+// HistoryTotals defines model for HistoryTotals.
+type HistoryTotals struct {
+	CompletionTokens int64 `json:"completion_tokens"`
+
+	// CostEstimated True when any part of the cost was estimated from token counts
+	CostEstimated bool    `json:"cost_estimated"`
+	CostUsd       float64 `json:"cost_usd"`
+	PromptTokens  int64   `json:"prompt_tokens"`
+	Runs          int     `json:"runs"`
 }
 
 // Issue One entry of the editor-in-chief's prioritized list, with the author's decision.
@@ -794,6 +869,27 @@ type Me struct {
 	DefaultModelAlias string `json:"default_model_alias"`
 	User              User   `json:"user"`
 }
+
+// ModelCall One request to the gateway, as recorded.
+type ModelCall struct {
+	CompletionTokens int                 `json:"completion_tokens"`
+	CostEstimated    bool                `json:"cost_estimated"`
+	CostUsd          float64             `json:"cost_usd"`
+	CreatedAt        time.Time           `json:"created_at"`
+	Error            string              `json:"error"`
+	GenerationName   string              `json:"generation_name"`
+	Id               openapi_types.UUID  `json:"id"`
+	LatencyMs        int                 `json:"latency_ms"`
+	ModelAlias       string              `json:"model_alias"`
+	PromptTokens     int                 `json:"prompt_tokens"`
+	RunId            *openapi_types.UUID `json:"run_id,omitempty"`
+	Status           ModelCallStatus     `json:"status"`
+	WriterId         *openapi_types.UUID `json:"writer_id,omitempty"`
+	WriterName       *string             `json:"writer_name,omitempty"`
+}
+
+// ModelCallStatus defines model for ModelCall.Status.
+type ModelCallStatus string
 
 // Project defines model for Project.
 type Project struct {
@@ -873,6 +969,15 @@ type RevisionStartInput struct {
 // RevisionStatus defines model for RevisionStatus.
 type RevisionStatus string
 
+// RevisionSummary defines model for RevisionSummary.
+type RevisionSummary struct {
+	AppliedHunks int            `json:"applied_hunks"`
+	Hunks        int            `json:"hunks"`
+	Status       RevisionStatus `json:"status"`
+	WordsAdded   int            `json:"words_added"`
+	WordsRemoved int            `json:"words_removed"`
+}
+
 // Run One workflow execution. params holds what started it, result what it produced.
 type Run struct {
 	ChapterId        *openapi_types.UUID     `json:"chapter_id,omitempty"`
@@ -899,6 +1004,22 @@ type RunEvent struct {
 	RunId     openapi_types.UUID     `json:"run_id"`
 	Seq       int                    `json:"seq"`
 	Type      string                 `json:"type"`
+}
+
+// RunHistoryItem defines model for RunHistoryItem.
+type RunHistoryItem struct {
+	Bible      *BibleSummary    `json:"bible,omitempty"`
+	Critique   *CritiqueSummary `json:"critique,omitempty"`
+	Drafts     *DraftsSummary   `json:"drafts,omitempty"`
+	ModelCalls int              `json:"model_calls"`
+	Revision   *RevisionSummary `json:"revision,omitempty"`
+
+	// Run One workflow execution. params holds what started it, result what it produced.
+	Run Run `json:"run"`
+
+	// Summary One line saying what the run did and what came of it
+	Summary string   `json:"summary"`
+	Writers []string `json:"writers"`
 }
 
 // RunKind defines model for RunKind.
@@ -1036,6 +1157,13 @@ type ListChapterDraftsParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// GetChapterHistoryParams defines parameters for GetChapterHistory.
+type GetChapterHistoryParams struct {
+	Kind   *RunKind   `form:"kind,omitempty" json:"kind,omitempty"`
+	Limit  *int       `form:"limit,omitempty" json:"limit,omitempty"`
+	Before *time.Time `form:"before,omitempty" json:"before,omitempty"`
+}
+
 // ListChapterRevisionsParams defines parameters for ListChapterRevisions.
 type ListChapterRevisionsParams struct {
 	Status *RevisionStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -1154,6 +1282,9 @@ type ServerInterface interface {
 	// StartCowrite Ask one co-writer for a draft, or two or three for drafts to compare
 	// (POST /api/chapters/{chapterId}/drafts)
 	StartCowrite(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
+	// GetChapterHistory Every run of a chapter, newest first, with totals
+	// (GET /api/chapters/{chapterId}/history)
+	GetChapterHistory(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params GetChapterHistoryParams)
 	// ListChapterRevisions Revisions proposed for a chapter, newest first
 	// (GET /api/chapters/{chapterId}/revisions)
 	ListChapterRevisions(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterRevisionsParams)
@@ -1232,6 +1363,9 @@ type ServerInterface interface {
 	// ListRunBibleProposals The proposals a bible update run produced
 	// (GET /api/runs/{runId}/bible-proposals)
 	ListRunBibleProposals(w http.ResponseWriter, r *http.Request, runId RunId)
+	// ListRunCalls The gateway calls a run made, with cost and tokens per writer
+	// (GET /api/runs/{runId}/calls)
+	ListRunCalls(w http.ResponseWriter, r *http.Request, runId RunId)
 	// CancelRun Stop a running run; a finished run is returned unchanged
 	// (POST /api/runs/{runId}/cancel)
 	CancelRun(w http.ResponseWriter, r *http.Request, runId RunId)
@@ -1339,6 +1473,12 @@ func (_ Unimplemented) ListChapterDrafts(w http.ResponseWriter, r *http.Request,
 // StartCowrite Ask one co-writer for a draft, or two or three for drafts to compare
 // (POST /api/chapters/{chapterId}/drafts)
 func (_ Unimplemented) StartCowrite(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetChapterHistory Every run of a chapter, newest first, with totals
+// (GET /api/chapters/{chapterId}/history)
+func (_ Unimplemented) GetChapterHistory(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params GetChapterHistoryParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1482,6 +1622,12 @@ func (_ Unimplemented) GetRun(w http.ResponseWriter, r *http.Request, runId RunI
 // ListRunBibleProposals The proposals a bible update run produced
 // (GET /api/runs/{runId}/bible-proposals)
 func (_ Unimplemented) ListRunBibleProposals(w http.ResponseWriter, r *http.Request, runId RunId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListRunCalls The gateway calls a run made, with cost and tokens per writer
+// (GET /api/runs/{runId}/calls)
+func (_ Unimplemented) ListRunCalls(w http.ResponseWriter, r *http.Request, runId RunId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1863,6 +2009,74 @@ func (siw *ServerInterfaceWrapper) StartCowrite(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.StartCowrite(w, r, chapterId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChapterHistory operation middleware
+func (siw *ServerInterfaceWrapper) GetChapterHistory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "chapterId" -------------
+	var chapterId ChapterId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "chapterId", chi.URLParam(r, "chapterId"), &chapterId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "chapterId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetChapterHistoryParams
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "before" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChapterHistory(w, r, chapterId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2605,6 +2819,32 @@ func (siw *ServerInterfaceWrapper) ListRunBibleProposals(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// ListRunCalls operation middleware
+func (siw *ServerInterfaceWrapper) ListRunCalls(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRunCalls(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CancelRun operation middleware
 func (siw *ServerInterfaceWrapper) CancelRun(w http.ResponseWriter, r *http.Request) {
 
@@ -3160,6 +3400,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/drafts/{draftId}/decision", wrapper.DecideDraft)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/chapters/{chapterId}/history", wrapper.GetChapterHistory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/runs/{runId}/calls", wrapper.ListRunCalls)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}", wrapper.GetRun)

@@ -57,3 +57,23 @@ export const VERSION_KIND_LABELS: Record<string, string> = {
   pre_revision: "Before revision",
   pre_restore: "Before restore",
 };
+
+export const RUN_KIND_LABELS: Record<string, string> = {
+  critique: "Critique",
+  revision: "Revision",
+  bible_update: "Bible update",
+  cowrite: "Co-write",
+  compare: "Compare",
+  writer_test: "Writer test",
+};
+
+export function fmtDuration(startIso: string | undefined, endIso: string | undefined): string {
+  if (!startIso || !endIso) return "";
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  if (ms < 0) return "";
+  if (ms < 1000) return `${ms} ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(s < 10 ? 1 : 0)} s`;
+  const m = Math.floor(s / 60);
+  return `${m} min ${Math.round(s - m * 60)} s`;
+}

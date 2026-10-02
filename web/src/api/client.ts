@@ -47,6 +47,10 @@ export type Draft = Schemas["Draft"];
 export type DraftMode = Schemas["DraftMode"];
 export type DraftDecision = Schemas["DraftDecision"];
 export type CowriteStartInput = Schemas["CowriteStartInput"];
+export type HistoryPage = Schemas["HistoryPage"];
+export type RunHistoryItem = Schemas["RunHistoryItem"];
+export type HistoryTotals = Schemas["HistoryTotals"];
+export type ModelCall = Schemas["ModelCall"];
 
 /** ApiError carries the server's stable error code alongside the message. */
 export class ApiError extends Error {

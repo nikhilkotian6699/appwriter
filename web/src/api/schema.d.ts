@@ -608,6 +608,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chapters/{chapterId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Every run of a chapter, newest first, with totals
+         * @description Runs with a one-line summary each and the counts behind it (critics,
+         *     issues and decisions, revision changes, drafts, proposals), the
+         *     totals of runs, cost and tokens over every run matching `kind`, and
+         *     per-kind counts for the filter. Page through with `before`.
+         */
+        get: operations["getChapterHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        /** The gateway calls a run made, with cost and tokens per writer */
+        get: operations["listRunCalls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{runId}": {
         parameters: {
             query?: never;
@@ -1295,6 +1339,95 @@ export interface components {
         };
         DraftDecisionInput: {
             decision: components["schemas"]["DraftDecision"];
+        };
+        HistoryTotals: {
+            runs: number;
+            /** Format: double */
+            cost_usd: number;
+            /** @description True when any part of the cost was estimated from token counts */
+            cost_estimated: boolean;
+            /** Format: int64 */
+            prompt_tokens: number;
+            /** Format: int64 */
+            completion_tokens: number;
+        };
+        HistoryKindCount: {
+            kind: components["schemas"]["RunKind"];
+            count: number;
+        };
+        CritiqueSummary: {
+            critics: number;
+            failed: number;
+            issues: number;
+            accepted: number;
+            rejected: number;
+            pending: number;
+            /** @description ok */
+            synthesis: string;
+        };
+        RevisionSummary: {
+            status: components["schemas"]["RevisionStatus"];
+            hunks: number;
+            applied_hunks: number;
+            words_added: number;
+            words_removed: number;
+        };
+        DraftsSummary: {
+            count: number;
+            inserted: number;
+            replaced: number;
+            discarded: number;
+            pending: number;
+        };
+        BibleSummary: {
+            proposals: number;
+            approved: number;
+            rejected: number;
+            pending: number;
+        };
+        RunHistoryItem: {
+            run: components["schemas"]["Run"];
+            /** @description One line saying what the run did and what came of it */
+            summary: string;
+            writers: string[];
+            model_calls: number;
+            critique?: components["schemas"]["CritiqueSummary"];
+            revision?: components["schemas"]["RevisionSummary"];
+            drafts?: components["schemas"]["DraftsSummary"];
+            bible?: components["schemas"]["BibleSummary"];
+        };
+        HistoryPage: {
+            items: components["schemas"]["RunHistoryItem"][];
+            totals: components["schemas"]["HistoryTotals"];
+            kinds: components["schemas"]["HistoryKindCount"][];
+            /**
+             * Format: date-time
+             * @description Pass as `before` to get the next page; absent on the last page
+             */
+            next_before?: string;
+        };
+        /** @description One request to the gateway, as recorded. */
+        ModelCall: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            run_id?: string;
+            /** Format: uuid */
+            writer_id?: string;
+            writer_name?: string;
+            generation_name: string;
+            model_alias: string;
+            prompt_tokens: number;
+            completion_tokens: number;
+            /** Format: double */
+            cost_usd: number;
+            cost_estimated: boolean;
+            latency_ms: number;
+            /** @enum {string} */
+            status: "ok" | "error";
+            error: string;
+            /** Format: date-time */
+            created_at: string;
         };
     };
     responses: {
@@ -2336,6 +2469,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Draft"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getChapterHistory: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["RunKind"];
+                limit?: number;
+                before?: string;
+            };
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPage"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRunCalls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCall"][];
                 };
             };
             default: components["responses"]["Error"];
