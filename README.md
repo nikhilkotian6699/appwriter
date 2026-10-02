@@ -126,6 +126,17 @@ to change its display name and its password: at least 8 characters, current
 password required, and a change signs the account out everywhere else while
 the browser that made it keeps a fresh session.
 
+### Isolation test
+
+`TestIntegrationIsolation` (in `internal/api`) walks every route of the
+router and calls each one as a second account against the first account's
+project, chapter, snapshot, bible entry, writer, run, critique, issue,
+revision, draft and proposal. Each route needs a probe saying what must come
+back (404 for another account's things, 403 for admin-only routes, or a reply
+that mentions none of the first account's identifiers); a new route without a
+probe fails the test, so no endpoint can ship without saying how it keeps
+accounts apart.
+
 ## Development
 
 ```bash

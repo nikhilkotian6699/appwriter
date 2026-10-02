@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M7 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-03 (M7 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -19,8 +19,8 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 4 | Revision with diff and hunks, bible-keeper proposals | Built on 3 feature branches, awaiting merge | see branches |
 | 5 | Co-writing workflow and compare mode | Built on 2 feature branches, awaiting merge | see branches |
 | 6 | Run history, cost and writer stats, settings page | Built on 2 feature branches, awaiting merge | see branches |
-| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | In progress (auth-lib, login, users-and-account-pages pushed) | |
-| 8 | Account management: usage per user, roles, passwords, disable, delete | Not started | |
+| 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Built on 4 feature branches, awaiting merge | see branches |
+| 8 | Account management: usage per user, roles, passwords, disable, delete | Next | |
 | 9 | In-app guide for new users | Not started | |
 
 ## Feature branches
@@ -51,7 +51,7 @@ branch is merged.
 | 7 | `feature/auth-lib` | — | Pushed (awaiting merge) |
 | 7 | `feature/login` | auth-lib | Pushed (awaiting merge) |
 | 7 | `feature/users-and-account-pages` | login | Pushed (awaiting merge) |
-| 7 | `feature/isolation-test` | login | Not started |
+| 7 | `feature/isolation-test` | login | Pushed (awaiting merge) |
 | 8 | `feature/account-usage` | users-and-account-pages | Not started |
 | 8 | `feature/account-management` | users-and-account-pages | Not started |
 | 9 | `feature/guide-screenshots` | everything else | Not started |
@@ -212,7 +212,18 @@ when work started):
   Users page with the account list and an add form (admins; nav link only
   for admins), Account page (display name, password change), the header
   name links to it; integration coverage.
-- Next: `feature/isolation-test`.
+- `feature/isolation-test` is done and pushed: TestIntegrationIsolation walks
+  every router route as a second account against the first account's
+  fixtures (one of everything), with a probe per route (404 / 403 / public /
+  own-data-only) and fails for any route without one or any probe naming a
+  vanished route.
+
+Milestone 7 is complete pending merge (order: auth-lib, login,
+users-and-account-pages, isolation-test) and the live gateway check. Note:
+the dev database now has a throwaway admin account `tester` (created
+2026-10-03 for browser checks); delete it on the Users page once M8 adds
+deletion, or leave it. Next: Milestone 8 on `feature/account-usage` and
+`feature/account-management`.
 
 ## Open items
 
