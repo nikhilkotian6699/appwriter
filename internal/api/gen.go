@@ -92,30 +92,75 @@ func (e ChapterVersionSummaryKind) Valid() bool {
 	}
 }
 
+// Defines values for CritiqueStatus.
+const (
+	CritiqueStatusCancelled CritiqueStatus = "cancelled"
+	CritiqueStatusFailed    CritiqueStatus = "failed"
+	CritiqueStatusRunning   CritiqueStatus = "running"
+	CritiqueStatusSucceeded CritiqueStatus = "succeeded"
+)
+
+// Valid indicates whether the value is a known member of the CritiqueStatus enum.
+func (e CritiqueStatus) Valid() bool {
+	switch e {
+	case CritiqueStatusCancelled:
+		return true
+	case CritiqueStatusFailed:
+		return true
+	case CritiqueStatusRunning:
+		return true
+	case CritiqueStatusSucceeded:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IssueSeverity.
+const (
+	High   IssueSeverity = "high"
+	Low    IssueSeverity = "low"
+	Medium IssueSeverity = "medium"
+)
+
+// Valid indicates whether the value is a known member of the IssueSeverity enum.
+func (e IssueSeverity) Valid() bool {
+	switch e {
+	case High:
+		return true
+	case Low:
+		return true
+	case Medium:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunKind.
 const (
-	BibleUpdate RunKind = "bible_update"
-	Compare     RunKind = "compare"
-	Cowrite     RunKind = "cowrite"
-	Critique    RunKind = "critique"
-	Revision    RunKind = "revision"
-	WriterTest  RunKind = "writer_test"
+	RunKindBibleUpdate RunKind = "bible_update"
+	RunKindCompare     RunKind = "compare"
+	RunKindCowrite     RunKind = "cowrite"
+	RunKindCritique    RunKind = "critique"
+	RunKindRevision    RunKind = "revision"
+	RunKindWriterTest  RunKind = "writer_test"
 )
 
 // Valid indicates whether the value is a known member of the RunKind enum.
 func (e RunKind) Valid() bool {
 	switch e {
-	case BibleUpdate:
+	case RunKindBibleUpdate:
 		return true
-	case Compare:
+	case RunKindCompare:
 		return true
-	case Cowrite:
+	case RunKindCowrite:
 		return true
-	case Critique:
+	case RunKindCritique:
 		return true
-	case Revision:
+	case RunKindRevision:
 		return true
-	case WriterTest:
+	case RunKindWriterTest:
 		return true
 	default:
 		return false
@@ -124,25 +169,25 @@ func (e RunKind) Valid() bool {
 
 // Defines values for RunStatus.
 const (
-	Cancelled RunStatus = "cancelled"
-	Failed    RunStatus = "failed"
-	Queued    RunStatus = "queued"
-	Running   RunStatus = "running"
-	Succeeded RunStatus = "succeeded"
+	RunStatusCancelled RunStatus = "cancelled"
+	RunStatusFailed    RunStatus = "failed"
+	RunStatusQueued    RunStatus = "queued"
+	RunStatusRunning   RunStatus = "running"
+	RunStatusSucceeded RunStatus = "succeeded"
 )
 
 // Valid indicates whether the value is a known member of the RunStatus enum.
 func (e RunStatus) Valid() bool {
 	switch e {
-	case Cancelled:
+	case RunStatusCancelled:
 		return true
-	case Failed:
+	case RunStatusFailed:
 		return true
-	case Queued:
+	case RunStatusQueued:
 		return true
-	case Running:
+	case RunStatusRunning:
 		return true
-	case Succeeded:
+	case RunStatusSucceeded:
 		return true
 	default:
 		return false
@@ -183,6 +228,14 @@ func (e WriterRole) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// BibleConflict defines model for BibleConflict.
+type BibleConflict struct {
+	ConflictsWith string `json:"conflicts_with"`
+	End           int    `json:"end"`
+	Quote         string `json:"quote"`
+	Start         int    `json:"start"`
 }
 
 // BibleEntry defines model for BibleEntry.
@@ -287,6 +340,62 @@ type ChapterVersionSummary struct {
 // ChapterVersionSummaryKind defines model for ChapterVersionSummary.Kind.
 type ChapterVersionSummaryKind string
 
+// Critique defines model for Critique.
+type Critique struct {
+	BibleConflicts []BibleConflict `json:"bible_conflicts"`
+	Issues         []CritiqueIssue `json:"issues"`
+	Overall        string          `json:"overall"`
+	Warnings       *[]string       `json:"warnings,omitempty"`
+	Writer         string          `json:"writer"`
+}
+
+// CritiqueIssue defines model for CritiqueIssue.
+type CritiqueIssue struct {
+	End     int    `json:"end"`
+	Id      string `json:"id"`
+	Problem string `json:"problem"`
+	Quote   string `json:"quote"`
+
+	// QuoteExact False when the quote matched only after normalising punctuation
+	QuoteExact bool          `json:"quote_exact"`
+	Severity   IssueSeverity `json:"severity"`
+
+	// Start Byte offset of the quote in the chapter Markdown
+	Start        int    `json:"start"`
+	SuggestedFix string `json:"suggested_fix"`
+}
+
+// CritiqueRecord One critic's part of a critique run.
+type CritiqueRecord struct {
+	ChapterId        *openapi_types.UUID `json:"chapter_id,omitempty"`
+	CompletionTokens int                 `json:"completion_tokens"`
+	CostEstimated    bool                `json:"cost_estimated"`
+	CostUsd          float64             `json:"cost_usd"`
+	CreatedAt        time.Time           `json:"created_at"`
+	Critique         *Critique           `json:"critique,omitempty"`
+	Error            string              `json:"error"`
+	FinishedAt       *time.Time          `json:"finished_at,omitempty"`
+	Id               openapi_types.UUID  `json:"id"`
+	ModelAlias       string              `json:"model_alias"`
+	PromptTokens     int                 `json:"prompt_tokens"`
+	RawText          string              `json:"raw_text"`
+	RunId            openapi_types.UUID  `json:"run_id"`
+	SceneCount       int                 `json:"scene_count"`
+	Status           CritiqueStatus      `json:"status"`
+	WriterId         *openapi_types.UUID `json:"writer_id,omitempty"`
+	WriterName       string              `json:"writer_name"`
+	WriterSlug       string              `json:"writer_slug"`
+}
+
+// CritiqueStartInput defines model for CritiqueStartInput.
+type CritiqueStartInput struct {
+	// WriterIds Critics to convene; omitted or empty means every enabled writer with the critic role.
+	WriterIds *[]openapi_types.UUID `json:"writer_ids,omitempty"`
+}
+
+// CritiqueStatus defines model for CritiqueStatus.
+type CritiqueStatus string
+
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
 	Error struct {
@@ -303,6 +412,9 @@ type GatewayModels struct {
 	Aliases   []string `json:"aliases"`
 	AllModels []string `json:"all_models"`
 }
+
+// IssueSeverity defines model for IssueSeverity.
+type IssueSeverity string
 
 // Me defines model for Me.
 type Me struct {
@@ -495,6 +607,9 @@ type UpdateChapterJSONRequestBody = ChapterMetaInput
 // SaveChapterContentJSONRequestBody defines body for SaveChapterContent for application/json ContentType.
 type SaveChapterContentJSONRequestBody = ChapterContentInput
 
+// StartCritiqueJSONRequestBody defines body for StartCritique for application/json ContentType.
+type StartCritiqueJSONRequestBody = CritiqueStartInput
+
 // CreateChapterSnapshotJSONRequestBody defines body for CreateChapterSnapshot for application/json ContentType.
 type CreateChapterSnapshotJSONRequestBody = SnapshotInput
 
@@ -542,6 +657,9 @@ type ServerInterface interface {
 	// SaveChapterContent Save the chapter text; may create an autosave snapshot
 	// (PUT /api/chapters/{chapterId}/content)
 	SaveChapterContent(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
+	// StartCritique Convene the Guild on a chapter
+	// (POST /api/chapters/{chapterId}/critiques)
+	StartCritique(w http.ResponseWriter, r *http.Request, chapterId ChapterId)
 	// ListChapterRuns Runs of a chapter, newest first
 	// (GET /api/chapters/{chapterId}/runs)
 	ListChapterRuns(w http.ResponseWriter, r *http.Request, chapterId ChapterId, params ListChapterRunsParams)
@@ -596,6 +714,9 @@ type ServerInterface interface {
 	// CancelRun Stop a running run; a finished run is returned unchanged
 	// (POST /api/runs/{runId}/cancel)
 	CancelRun(w http.ResponseWriter, r *http.Request, runId RunId)
+	// ListRunCritiques The critics' validated replies for a critique run
+	// (GET /api/runs/{runId}/critiques)
+	ListRunCritiques(w http.ResponseWriter, r *http.Request, runId RunId)
 	// StreamRunEvents Follow a run as Server-Sent Events
 	// (GET /api/runs/{runId}/events)
 	StreamRunEvents(w http.ResponseWriter, r *http.Request, runId RunId, params StreamRunEventsParams)
@@ -661,6 +782,12 @@ func (_ Unimplemented) UpdateChapter(w http.ResponseWriter, r *http.Request, cha
 // SaveChapterContent Save the chapter text; may create an autosave snapshot
 // (PUT /api/chapters/{chapterId}/content)
 func (_ Unimplemented) SaveChapterContent(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// StartCritique Convene the Guild on a chapter
+// (POST /api/chapters/{chapterId}/critiques)
+func (_ Unimplemented) StartCritique(w http.ResponseWriter, r *http.Request, chapterId ChapterId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -757,6 +884,12 @@ func (_ Unimplemented) GetRun(w http.ResponseWriter, r *http.Request, runId RunI
 // CancelRun Stop a running run; a finished run is returned unchanged
 // (POST /api/runs/{runId}/cancel)
 func (_ Unimplemented) CancelRun(w http.ResponseWriter, r *http.Request, runId RunId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListRunCritiques The critics' validated replies for a critique run
+// (GET /api/runs/{runId}/critiques)
+func (_ Unimplemented) ListRunCritiques(w http.ResponseWriter, r *http.Request, runId RunId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -968,6 +1101,32 @@ func (siw *ServerInterfaceWrapper) SaveChapterContent(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SaveChapterContent(w, r, chapterId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartCritique operation middleware
+func (siw *ServerInterfaceWrapper) StartCritique(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "chapterId" -------------
+	var chapterId ChapterId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "chapterId", chi.URLParam(r, "chapterId"), &chapterId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "chapterId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartCritique(w, r, chapterId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1444,6 +1603,32 @@ func (siw *ServerInterfaceWrapper) CancelRun(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// ListRunCritiques operation middleware
+func (siw *ServerInterfaceWrapper) ListRunCritiques(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "runId" -------------
+	var runId RunId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runId", chi.URLParam(r, "runId"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRunCritiques(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StreamRunEvents operation middleware
 func (siw *ServerInterfaceWrapper) StreamRunEvents(w http.ResponseWriter, r *http.Request) {
 
@@ -1844,6 +2029,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/chapters/{chapterId}/runs", wrapper.ListChapterRuns)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/chapters/{chapterId}/critiques", wrapper.StartCritique)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/runs/{runId}/critiques", wrapper.ListRunCritiques)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/runs/{runId}", wrapper.GetRun)

@@ -33,7 +33,7 @@ func SplitScenes(md string, tokenLimit int) []Scene {
 		}
 		pieces = append(pieces, cutAtParagraphs(md, seg, tokenLimit)...)
 	}
-	merged := mergeSpans(md, pieces, tokenLimit)
+	merged := foldFillers(md, mergeSpans(md, pieces, tokenLimit))
 	scenes := make([]Scene, 0, len(merged))
 	for i, sp := range merged {
 		text := md[sp.start:sp.end]
@@ -146,6 +146,47 @@ func mergeSpans(md string, spans []span, limit int) []span {
 		out = append(out, sp)
 	}
 	return out
+}
+
+// foldFillers attaches spans that hold no prose (only headings, breaks and
+// blank lines) to the span that follows them, or to the previous one at the
+// end, whatever the limit says: a scene of nothing but a heading helps nobody.
+func foldFillers(md string, spans []span) []span {
+	var out []span
+	var pending *span
+	for _, sp := range spans {
+		if isFiller(md[sp.start:sp.end]) {
+			if pending == nil {
+				p := sp
+				pending = &p
+			} else {
+				pending.end = sp.end
+			}
+			continue
+		}
+		if pending != nil {
+			sp.start = pending.start
+			pending = nil
+		}
+		out = append(out, sp)
+	}
+	if pending != nil {
+		if n := len(out); n > 0 {
+			out[n-1].end = pending.end
+		} else {
+			out = append(out, *pending)
+		}
+	}
+	return out
+}
+
+func isFiller(text string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		if t := strings.TrimSpace(line); t != "" && !isBoundary(t) {
+			return false
+		}
+	}
+	return true
 }
 
 // sceneTitle uses the heading a scene opens with, else "Scene N".

@@ -46,6 +46,28 @@ type ChapterVersion struct {
 	CreatedAt   time.Time
 }
 
+type Critique struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	RunID            uuid.UUID
+	ChapterID        uuid.NullUUID
+	WriterID         uuid.NullUUID
+	WriterName       string
+	WriterSlug       string
+	ModelAlias       string
+	Status           string
+	RawText          string
+	Critique         []byte
+	Error            string
+	SceneCount       int32
+	PromptTokens     int32
+	CompletionTokens int32
+	CostUsd          float64
+	CostEstimated    bool
+	CreatedAt        time.Time
+	FinishedAt       *time.Time
+}
+
 type ModelCall struct {
 	ID               uuid.UUID
 	UserID           uuid.UUID

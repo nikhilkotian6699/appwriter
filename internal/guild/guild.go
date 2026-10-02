@@ -6,24 +6,36 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
+	"writersguild/internal/db/sqlcgen"
 	"writersguild/internal/llm"
 	"writersguild/internal/runs"
 )
 
-// Guild runs workflows on top of the run tracker.
+// Guild runs workflows on top of the run engine.
 type Guild struct {
+	engine  *runs.Engine
 	tracker *runs.Tracker
+	q       *sqlcgen.Queries
 	appName string
+	// CallTimeout bounds one gateway call of one writer.
+	CallTimeout time.Duration
 }
 
 // New wires a Guild.
-func New(tracker *runs.Tracker, appName string) *Guild {
-	return &Guild{tracker: tracker, appName: appName}
+func New(engine *runs.Engine, q *sqlcgen.Queries, appName string, callTimeout time.Duration) *Guild {
+	if callTimeout <= 0 {
+		callTimeout = 2 * time.Minute
+	}
+	return &Guild{engine: engine, tracker: engine.Tracker(), q: q, appName: appName, CallTimeout: callTimeout}
 }
 
 // Tracker exposes the run tracker.
 func (g *Guild) Tracker() *runs.Tracker { return g.tracker }
+
+// Engine exposes the run engine.
+func (g *Guild) Engine() *runs.Engine { return g.engine }
 
 // FriendlyError turns a gateway failure into a sentence for the UI without
 // leaking anything secret.

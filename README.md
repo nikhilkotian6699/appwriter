@@ -140,6 +140,24 @@ what it missed, first from the database and then live. The stream closes
 after `run.finished`; a run that was already over replays and ends with an
 `end` event, which tells the browser not to reconnect.
 
+### Convening the Guild (critique)
+
+`POST /api/chapters/{id}/critiques` starts a critique run with the chosen
+critics (default: every enabled writer with the critic role) and returns the
+run at once. Each critic reads the story bible and the chapter in parallel and
+streams its reply; the run emits `critique.plan`, then per writer
+`writer.started`, `writer.delta` (coalesced text chunks), `writer.retry` when
+a reply failed validation, and `writer.done` or `writer.failed`. Every reply
+must be the JSON object described in `guild.CritiqueFormat`; the app
+validates it (severity, at most three issues, every quote found in the chapter
+text, ids unique) and asks once more on invalid output. Validated critiques,
+with byte offsets of every quote into the chapter, are at
+`GET /api/runs/{id}/critiques`; one failing writer does not fail the run.
+
+Chapters estimated above the account's scene token limit (Settings) are split
+at scene breaks and headings and critiqued scene by scene; issue ids are then
+prefixed `s1-`, `s2-`, … and offsets still address the whole chapter.
+
 `POST /api/runs/{id}/cancel` stops a run; `GET /api/chapters/{id}/runs?kind=`
 lists a chapter's runs, newest first. Runs left running by a crash are marked
 failed at the next start.

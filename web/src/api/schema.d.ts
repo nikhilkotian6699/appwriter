@@ -257,6 +257,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chapters/{chapterId}/critiques": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convene the Guild on a chapter
+         * @description Starts a critique run in the background and returns it at once. The
+         *     chosen critics read the chapter (split into scenes above the account's
+         *     scene token limit) in parallel; follow them through
+         *     `GET /api/runs/{runId}/events`. Event types: `critique.plan`,
+         *     `writer.started`, `writer.delta`, `writer.retry`, `writer.done`,
+         *     `writer.failed`, then `run.finished`. The validated critiques are at
+         *     `GET /api/runs/{runId}/critiques`.
+         */
+        post: operations["startCritique"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{runId}/critiques": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        /** The critics' validated replies for a critique run */
+        get: operations["listRunCritiques"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{runId}": {
         parameters: {
             query?: never;
@@ -648,6 +695,67 @@ export interface components {
             };
             /** Format: date-time */
             created_at: string;
+        };
+        CritiqueStartInput: {
+            /** @description Critics to convene; omitted or empty means every enabled writer with the critic role. */
+            writer_ids?: string[];
+        };
+        /** @enum {string} */
+        IssueSeverity: "high" | "medium" | "low";
+        CritiqueIssue: {
+            id: string;
+            severity: components["schemas"]["IssueSeverity"];
+            quote: string;
+            problem: string;
+            suggested_fix: string;
+            /** @description Byte offset of the quote in the chapter Markdown */
+            start: number;
+            end: number;
+            /** @description False when the quote matched only after normalising punctuation */
+            quote_exact: boolean;
+        };
+        BibleConflict: {
+            quote: string;
+            conflicts_with: string;
+            start: number;
+            end: number;
+        };
+        Critique: {
+            writer: string;
+            overall: string;
+            issues: components["schemas"]["CritiqueIssue"][];
+            bible_conflicts: components["schemas"]["BibleConflict"][];
+            warnings?: string[];
+        };
+        /** @enum {string} */
+        CritiqueStatus: "running" | "succeeded" | "failed" | "cancelled";
+        /** @description One critic's part of a critique run. */
+        CritiqueRecord: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            run_id: string;
+            /** Format: uuid */
+            chapter_id?: string;
+            /** Format: uuid */
+            writer_id?: string;
+            writer_name: string;
+            writer_slug: string;
+            model_alias: string;
+            status: components["schemas"]["CritiqueStatus"];
+            critique?: components["schemas"]["Critique"];
+            raw_text: string;
+            error: string;
+            scene_count: number;
+            prompt_tokens: number;
+            completion_tokens: number;
+            /** Format: double */
+            cost_usd: number;
+            cost_estimated: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at?: string;
         };
     };
     responses: {
@@ -1254,6 +1362,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Run"][];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    startCritique: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapterId: components["parameters"]["chapterId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CritiqueStartInput"];
+            };
+        };
+        responses: {
+            /** @description The run that was started */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    listRunCritiques: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["runId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CritiqueRecord"][];
                 };
             };
             default: components["responses"]["Error"];

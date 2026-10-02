@@ -340,6 +340,49 @@ paths:
                 items: { $ref: "#/components/schemas/Run" }
         default: { $ref: "#/components/responses/Error" }
 
+  /api/chapters/{chapterId}/critiques:
+    parameters:
+      - $ref: "#/components/parameters/chapterId"
+    post:
+      operationId: startCritique
+      summary: Convene the Guild on a chapter
+      description: |
+        Starts a critique run in the background and returns it at once. The
+        chosen critics read the chapter (split into scenes above the account's
+        scene token limit) in parallel; follow them through
+        `GET /api/runs/{runId}/events`. Event types: `critique.plan`,
+        `writer.started`, `writer.delta`, `writer.retry`, `writer.done`,
+        `writer.failed`, then `run.finished`. The validated critiques are at
+        `GET /api/runs/{runId}/critiques`.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CritiqueStartInput" }
+      responses:
+        "202":
+          description: The run that was started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/runs/{runId}/critiques:
+    parameters:
+      - $ref: "#/components/parameters/runId"
+    get:
+      operationId: listRunCritiques
+      summary: The critics' validated replies for a critique run
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CritiqueRecord" }
+        default: { $ref: "#/components/responses/Error" }
+
   /api/runs/{runId}:
     parameters:
       - $ref: "#/components/parameters/runId"
@@ -830,3 +873,81 @@ components:
           type: object
           additionalProperties: true
         created_at: { type: string, format: date-time }
+
+    CritiqueStartInput:
+      type: object
+      properties:
+        writer_ids:
+          type: array
+          description: Critics to convene; omitted or empty means every enabled writer with the critic role.
+          items: { type: string, format: uuid }
+
+    IssueSeverity:
+      type: string
+      enum: [high, medium, low]
+
+    CritiqueIssue:
+      type: object
+      required: [id, severity, quote, problem, suggested_fix, start, end, quote_exact]
+      properties:
+        id: { type: string }
+        severity: { $ref: "#/components/schemas/IssueSeverity" }
+        quote: { type: string }
+        problem: { type: string }
+        suggested_fix: { type: string }
+        start: { type: integer, description: Byte offset of the quote in the chapter Markdown }
+        end: { type: integer }
+        quote_exact: { type: boolean, description: False when the quote matched only after normalising punctuation }
+
+    BibleConflict:
+      type: object
+      required: [quote, conflicts_with, start, end]
+      properties:
+        quote: { type: string }
+        conflicts_with: { type: string }
+        start: { type: integer }
+        end: { type: integer }
+
+    Critique:
+      type: object
+      required: [writer, overall, issues, bible_conflicts]
+      properties:
+        writer: { type: string }
+        overall: { type: string }
+        issues:
+          type: array
+          items: { $ref: "#/components/schemas/CritiqueIssue" }
+        bible_conflicts:
+          type: array
+          items: { $ref: "#/components/schemas/BibleConflict" }
+        warnings:
+          type: array
+          items: { type: string }
+
+    CritiqueStatus:
+      type: string
+      enum: [running, succeeded, failed, cancelled]
+
+    CritiqueRecord:
+      type: object
+      description: One critic's part of a critique run.
+      required: [id, run_id, writer_name, writer_slug, model_alias, status, raw_text, error, scene_count, prompt_tokens, completion_tokens, cost_usd, cost_estimated, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        chapter_id: { type: string, format: uuid }
+        writer_id: { type: string, format: uuid }
+        writer_name: { type: string }
+        writer_slug: { type: string }
+        model_alias: { type: string }
+        status: { $ref: "#/components/schemas/CritiqueStatus" }
+        critique: { $ref: "#/components/schemas/Critique" }
+        raw_text: { type: string }
+        error: { type: string }
+        scene_count: { type: integer }
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        cost_usd: { type: number, format: double }
+        cost_estimated: { type: boolean }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }

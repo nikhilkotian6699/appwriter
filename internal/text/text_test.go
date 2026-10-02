@@ -103,6 +103,21 @@ func TestSplitScenesFallsBackToParagraphs(t *testing.T) {
 	}
 }
 
+func TestSplitScenesFoldsHeadingsAndBreaks(t *testing.T) {
+	a := para("alpha", 200)
+	b := para("bravo", 200)
+	md := "# Title\n\n" + a + "\n\n* * *\n\n" + b + "\n"
+	limit := EstimateTokens(a) + 5 // each paragraph only just fits; the heading and break must not become scenes
+	scenes := SplitScenes(md, limit)
+	if len(scenes) != 2 {
+		t.Fatalf("want 2 scenes, got %d: %v", len(scenes), titles(scenes))
+	}
+	checkCoverage(t, md, scenes)
+	if scenes[0].Title != "Title" || !strings.HasPrefix(scenes[1].Text, "* * *") {
+		t.Fatalf("scenes %v / %q", titles(scenes), scenes[1].Text[:10])
+	}
+}
+
 func TestIsBoundary(t *testing.T) {
 	yes := []string{"---", "***", "* * *", "___", "- - -", "# Title", "###### Six", "  ---  "}
 	no := []string{"", "--", "#hashtag", "####### seven", "-- not a rule", "* item", "text"}

@@ -75,7 +75,7 @@ func run(log *slog.Logger, resetAdmin, healthcheck bool) error {
 	client := llm.NewLiteLLM(cfg.LiteLLMBaseURL, cfg.LiteLLMAPIKey)
 	tracker := runs.NewTracker(q, client, cfg.AppName)
 	engine := runs.NewEngine(tracker, q, cfg.RunTimeout, log)
-	g := guildpkg.New(tracker, cfg.AppName)
+	g := guildpkg.New(engine, q, cfg.AppName, cfg.LLMTimeout)
 	server := api.NewServer(cfg, pool, q, client, g, engine, log)
 
 	webFS, err := fs.Sub(web.Dist, "dist")

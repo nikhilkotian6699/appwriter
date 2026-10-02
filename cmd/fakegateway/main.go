@@ -207,13 +207,90 @@ func (g *gateway) reply(req chatRequest) string {
 		name = gen[i+1:]
 	}
 	switch {
-	case strings.HasPrefix(gen, "test:"):
+	case strings.HasPrefix(gen, "critic:"):
+		if strings.Contains(req.Model, "invalid") {
+			return "I would rather talk about the weather than return JSON."
+		}
+		return critiqueReply(name, req.Messages)
 		return fmt.Sprintf("I am %s, answering through the fake gateway as the model %q. When I read a chapter I look first for the sentence where the writer stopped trusting the reader, then for the one that earned its place. This reply is canned, so the real voice will have to wait for the real gateway.", name, req.Model)
 	case strings.HasPrefix(gen, "cowrite:"):
 		return "The lamp had been burning since before anyone remembered lighting it. She crossed the room without looking at it, the way you avoid looking at a person who has been talking for too long, and put her hand flat against the window to feel whether the cold outside was the honest kind. It was not. It was the kind that waits."
 	default:
 		return fmt.Sprintf("This is a canned reply from the fake gateway for %q using model %q.", gen, req.Model)
 	}
+}
+
+// critiqueReply builds a valid critique that quotes real sentences from the
+// chapter text found between the app's chapter markers in the last user
+// message, so quote validation passes.
+func critiqueReply(name string, msgs []message) string {
+	var chapter string
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role != "user" {
+			continue
+		}
+		c := msgs[i].Content
+		if a := strings.Index(c, "--- CHAPTER TEXT BEGIN ---"); a >= 0 {
+			c = c[a+len("--- CHAPTER TEXT BEGIN ---"):]
+			if b := strings.Index(c, "--- CHAPTER TEXT END ---"); b >= 0 {
+				c = c[:b]
+			}
+			chapter = strings.TrimSpace(c)
+			break
+		}
+	}
+	var sentences []string
+	for _, line := range strings.Split(chapter, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "---") || strings.HasPrefix(line, "* * *") {
+			continue
+		}
+		start := 0
+		for i, r := range line {
+			if r == '.' || r == '!' || r == '?' {
+				if s := strings.TrimSpace(line[start : i+1]); len(s) > 12 {
+					sentences = append(sentences, s)
+				}
+				start = i + 1
+			}
+		}
+		if len(sentences) >= 6 {
+			break
+		}
+	}
+	type issue struct {
+		ID           string `json:"id"`
+		Severity     string `json:"severity"`
+		Quote        string `json:"quote"`
+		Problem      string `json:"problem"`
+		SuggestedFix string `json:"suggested_fix"`
+	}
+	type conflict struct {
+		Quote         string `json:"quote"`
+		ConflictsWith string `json:"conflicts_with"`
+	}
+	out := map[string]any{
+		"writer":          name,
+		"overall":         fmt.Sprintf("A canned reading from %s through the fake gateway. The chapter moves, though a few sentences carry more than they need to.", name),
+		"issues":          []issue{},
+		"bible_conflicts": []conflict{},
+	}
+	sev := []string{"high", "medium", "low"}
+	issues := []issue{}
+	for i, s := range sentences {
+		if i >= 3 {
+			break
+		}
+		issues = append(issues, issue{ID: fmt.Sprintf("i%d", i+1), Severity: sev[i], Quote: s,
+			Problem:      fmt.Sprintf("%s would stop here: the sentence tells the reader what the scene already shows.", name),
+			SuggestedFix: "Cut the explanation and let the action stand; end the sentence one clause earlier."})
+	}
+	out["issues"] = issues
+	if len(sentences) > 3 {
+		out["bible_conflicts"] = []conflict{{Quote: sentences[3], ConflictsWith: "the story bible's note on this character (canned conflict from the fake gateway)"}}
+	}
+	b, _ := json.MarshalIndent(out, "", "  ")
+	return string(b)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

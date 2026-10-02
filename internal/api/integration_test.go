@@ -45,7 +45,7 @@ func newEnv(t *testing.T) *env {
 	tracker := runs.NewTracker(q, mock, cfg.AppName)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	engine := runs.NewEngine(tracker, q, 30*time.Second, logger)
-	g := guild.New(tracker, cfg.AppName)
+	g := guild.New(engine, q, cfg.AppName, cfg.LLMTimeout)
 	srv := NewServer(cfg, pool, q, mock, g, engine, logger)
 	srv.SetUserResolver(func(r *http.Request) (sqlcgen.User, error) { return q.GetUserByID(r.Context(), user.ID) })
 	static := fstest.MapFS{"index.html": {Data: []byte("app")}}
