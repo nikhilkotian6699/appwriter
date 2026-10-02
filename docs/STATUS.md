@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M9 built; all milestones built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-02 (all nine milestones built; offline-guards and preview-config fixes pushed) · `develop` at `6cd68b0` on origin (nothing from the 24-branch stack merged yet)
 
 ## Milestones
 
@@ -26,7 +26,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 ## Feature branches
 
 All work happens on a `feature/*` branch; the user merges to `develop` on
-GitHub. The 24 branches descend from `develop` at `d9eb22a` (2026-10-01);
+GitHub. The 25 branches descend from `develop` at `d9eb22a` (2026-10-01);
 each stacked branch was cut from the one it depends on. A downstream branch must rebase onto `develop` after its upstream
 branch is merged.
 
@@ -56,6 +56,7 @@ branch is merged.
 | 8 | `feature/account-management` | users-and-account-pages | Pushed (awaiting merge) |
 | 9 | `feature/guide-screenshots` | everything else | Pushed (awaiting merge) |
 | fix | `feature/offline-guards` | guide-screenshots | Pushed (awaiting merge) |
+| any | `feature/preview-config` | offline-guards | Pushed (awaiting merge) |
 
 Status values: Not started · In progress · Pushed (awaiting merge) · Merged.
 
@@ -276,11 +277,19 @@ none of the stack merged when work started):
   Reload / Back to projects instead of a white page. Reproduced and
   re-checked in the browser by firing the `offline` event and opening a
   project page.
+- `feature/preview-config` is done and pushed: the desktop app's Preview
+  (`.claude/launch.json`) used to try starting a second fake gateway on
+  :4000 and a second API on :8080, ports the compose containers already
+  hold, and failed with "port in use". The file now starts only the Vite
+  dev server (`web`, with `autoPort`; `vite.config.ts` honours `PORT`),
+  which proxies `/api` and `/guide` to the container; the container and the
+  fake gateway are opened directly. The README says how to run either
+  outside Docker.
 
 Milestone 9 is complete pending merge (order: guide-content, then
 guide-screenshots) and the live gateway check. All nine milestones are
-built. Remaining for the user: merge the 23-branch stack in order (the
-offline-guards fix last), add the
+built. Remaining for the user: merge the 24-branch stack in order
+(offline-guards and preview-config last), add the
 real gateway credentials to `.env` for the live checks, and delete the
 throwaway `tester` account (it owns the screenshot fixtures; keep it if you
 want to recapture).

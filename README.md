@@ -189,6 +189,16 @@ make dev-api           # run the API locally (reads .env)
 make dev-web           # Vite dev server on :5173 with /api proxied to :8080
 ```
 
+The desktop app's Preview (`.claude/launch.json`) starts one thing: the Vite
+dev server (`web`, normally :5173, or a free port the app hands it through
+`PORT`) with `/api` and `/guide` proxied to the container on :8080. The API
+and the fake gateway are not in that file because the compose containers
+already hold :8080 and :4000; open http://127.0.0.1:8080 directly for the
+built app, and http://127.0.0.1:4000/v1/models for the fake gateway. To run
+either outside Docker, stop the matching container first (`docker compose
+stop app` or `docker compose stop fakegateway`) and use `make dev-api` or
+`make fake` from a terminal.
+
 The HTTP contract is `api/openapi.yaml`; both the Go server interface and the
 TypeScript client are generated from it. Schema changes are goose migrations
 under `internal/db/migrations`, queries are sqlc files under

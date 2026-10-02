@@ -106,3 +106,8 @@ without type errors, the container runs, README is updated for anything new.
 - `docker compose --profile fake up -d` also starts the fake gateway; point
   `LITELLM_BASE_URL` at `http://fakegateway:4000` in `.env` to use it from the
   app container, or at `http://127.0.0.1:4000` when running the binary locally.
+- The desktop app's Preview (`.claude/launch.json`) starts only the Vite dev
+  server (`web`, :5173 or a port handed over through `PORT`), proxying `/api`
+  and `/guide` to the container on :8080. The container and the fake gateway
+  are opened directly (http://127.0.0.1:8080, http://127.0.0.1:4000); stop
+  the matching container before running either outside Docker.
