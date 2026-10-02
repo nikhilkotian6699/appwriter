@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, call } from "../api/client";
 import { keys, useProjects } from "../api/hooks";
-import { Button, Dialog, EmptyState, ErrorBanner, Field, Input, PageHeader, Spinner, Textarea } from "../components/ui";
+import { Button, Dialog, EmptyState, ErrorBanner, Field, Input, PageHeader, Pending, Textarea } from "../components/ui";
 import { timeAgo } from "../lib/format";
 
 export default function ProjectsPage() {
@@ -35,7 +35,7 @@ export default function ProjectsPage() {
         }
       />
       <ErrorBanner error={projects.error} onRetry={() => projects.refetch()} />
-      {projects.isLoading && <Spinner />}
+      {projects.isPending && <Pending paused={projects.isPaused} />}
       {projects.data && projects.data.length === 0 && (
         <EmptyState title="No projects yet">Start with "New project", then add a chapter and paste or write your text.</EmptyState>
       )}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, call, type User, type UserRole } from "../api/client";
 import { keys, useMe, useUsersUsage, type StatsPeriod } from "../api/hooks";
-import { Badge, Button, ConfirmDialog, Dialog, ErrorBanner, Field, Input, PageHeader, Select, Spinner } from "../components/ui";
+import { Badge, Button, ConfirmDialog, Dialog, ErrorBanner, Field, Input, PageHeader, Pending, Select } from "../components/ui";
 import { fmtCost, fmtDateTime, fmtTokens, timeAgo } from "../lib/format";
 
 const PERIODS: { value: StatsPeriod; label: string }[] = [
@@ -87,7 +87,7 @@ export default function UsersPage() {
             <span className="pb-1.5 text-xs text-stone-500">Projects and chapters are what each account holds now; runs, calls, tokens and cost are for the period.</span>
           </div>
           <ErrorBanner error={usage.error} onRetry={() => usage.refetch()} />
-          {usage.isLoading && <Spinner />}
+          {usage.isPending && <Pending paused={usage.isPaused} />}
           {usage.data && (
             <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white shadow-sm">
               <table className="w-full text-sm">

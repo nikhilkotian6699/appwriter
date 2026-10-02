@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, call } from "../api/client";
 import { keys, useSettings } from "../api/hooks";
-import { Button, ErrorBanner, Field, Input, PageHeader, Spinner } from "../components/ui";
+import { Button, ErrorBanner, Field, Input, PageHeader, Pending } from "../components/ui";
 
 export default function SettingsPage() {
   const settings = useSettings();
@@ -31,7 +31,7 @@ export default function SettingsPage() {
     <div className="max-w-xl">
       <PageHeader title="Settings" subtitle="These apply to your workspace only." />
       <ErrorBanner error={settings.error} onRetry={() => settings.refetch()} />
-      {settings.isLoading && <Spinner />}
+      {settings.isPending && <Pending paused={settings.isPaused} />}
       {settings.data && (
         <form
           className="space-y-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm"

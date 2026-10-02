@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Writer } from "../../api/client";
 import { useWriters } from "../../api/hooks";
-import { Badge, Button, Dialog, ErrorBanner, Field, Spinner, Textarea } from "../ui";
+import { Badge, Button, Dialog, ErrorBanner, Field, Pending, Textarea } from "../ui";
 
 export type CowriteContext = {
   /** The selected passage, or empty when continuing from the cursor. */
@@ -63,7 +63,7 @@ export function CowriteDialog({ open, busy, error, context, maxWriters, onClose,
         The story bible goes along either way.
       </p>
       <ErrorBanner error={writers.error} onRetry={() => writers.refetch()} />
-      {writers.isLoading && <Spinner />}
+      {writers.isPending && <Pending paused={writers.isPaused} />}
       <div className="mt-4">
         <span className="mb-1 block text-sm font-medium text-stone-700">{maxWriters > 1 ? `Writers (one to co-write, two or three to compare)` : "Writer"}</span>
         <ul className="max-h-48 divide-y divide-stone-100 overflow-y-auto rounded-md border border-stone-200">
@@ -88,7 +88,7 @@ export function CowriteDialog({ open, busy, error, context, maxWriters, onClose,
             </li>
           ))}
         </ul>
-        {!writers.isLoading && cowriters.filter((w) => w.enabled).length === 0 && (
+        {!writers.isPending && cowriters.filter((w) => w.enabled).length === 0 && (
           <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">No enabled writer has the co-writer role. Give a writer that role on the Writers page first.</p>
         )}
       </div>

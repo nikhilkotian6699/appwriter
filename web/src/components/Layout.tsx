@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, call } from "../api/client";
 import { keys, useMe } from "../api/hooks";
 import { LoginPage } from "../pages/LoginPage";
-import { Button, ErrorBanner, Spinner } from "./ui";
+import { Button, ErrorBanner, Pending } from "./ui";
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-md px-3 py-1.5 text-sm font-medium ${isActive ? "bg-stone-900 text-white" : "text-stone-700 hover:bg-stone-200"}`;
@@ -29,15 +29,16 @@ export function Layout() {
     },
   });
 
-  if (me.isLoading) {
-    return (
-      <div className="flex min-h-full items-center justify-center">
-        <Spinner />
-      </div>
-    );
-  }
   if (me.isError && me.error instanceof ApiError && me.error.status === 401) {
     return <LoginPage />;
+  }
+  if (!me.data && !me.isError) {
+    // First load, or a request paused while the browser is offline.
+    return (
+      <div className="flex min-h-full items-center justify-center">
+        <Pending paused={me.isPaused} />
+      </div>
+    );
   }
   return (
     <div className="flex min-h-full flex-col">

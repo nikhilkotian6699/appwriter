@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { WriterStats } from "../api/client";
 import { useProjects, useWriterStats, type StatsPeriod } from "../api/hooks";
-import { Badge, Button, EmptyState, ErrorBanner, PageHeader, Select, Spinner } from "../components/ui";
+import { Badge, Button, EmptyState, ErrorBanner, PageHeader, Pending, Select } from "../components/ui";
 import { fmtCost, fmtTokens, RUN_KIND_LABELS } from "../lib/format";
 
 type SortKey = "cost" | "issues" | "drafts" | "name";
@@ -83,7 +83,7 @@ export default function StatsPage() {
         </label>
       </div>
       <ErrorBanner error={stats.error} onRetry={() => stats.refetch()} />
-      {stats.isLoading && <Spinner />}
+      {stats.isPending && <Pending paused={stats.isPaused} />}
       {stats.data && (
         <>
           <div className="mb-4 grid gap-3 sm:grid-cols-3">

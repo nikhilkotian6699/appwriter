@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Writer } from "../../api/client";
 import { useWriters } from "../../api/hooks";
-import { Badge, Button, Dialog, ErrorBanner, Spinner } from "../ui";
+import { Badge, Button, Dialog, ErrorBanner, Pending } from "../ui";
 
 type Props = {
   open: boolean;
@@ -37,7 +37,7 @@ export function ConveneDialog({ open, busy, error, onClose, onStart }: Props) {
         cannot attend; enable them on the Writers page.
       </p>
       <ErrorBanner error={writers.error} onRetry={() => writers.refetch()} />
-      {writers.isLoading && <Spinner />}
+      {writers.isPending && <Pending paused={writers.isPaused} />}
       {critics.length > 0 && (
         <ul className="mt-4 max-h-80 divide-y divide-stone-100 overflow-y-auto rounded-md border border-stone-200">
           {critics.map((w) => (
@@ -61,7 +61,7 @@ export function ConveneDialog({ open, busy, error, onClose, onStart }: Props) {
           ))}
         </ul>
       )}
-      {!writers.isLoading && enabledCritics.length === 0 && (
+      {!writers.isPending && enabledCritics.length === 0 && (
         <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           No enabled writer has the critic role. Give a writer the critic role on the Writers page first.
         </p>

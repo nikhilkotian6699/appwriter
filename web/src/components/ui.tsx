@@ -41,6 +41,20 @@ export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+/**
+ * Pending stands in for a screen whose data has not arrived. A query that is
+ * not loading is not necessarily loaded: while the browser is offline the
+ * request is paused with no data, and the screen says so instead of guessing.
+ */
+export function Pending({ paused = false, className = "" }: { paused?: boolean; className?: string }) {
+  return (
+    <div role="status" className={`flex items-center gap-2 text-sm text-stone-500 ${className}`}>
+      <Spinner />
+      {paused && <span>Offline. Waiting for the network.</span>}
+    </div>
+  );
+}
+
 export function Field({ label, help, error, children }: { label: string; help?: string; error?: string; children: ReactNode }) {
   return (
     <label className="block">

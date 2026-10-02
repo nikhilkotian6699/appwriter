@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, call, type BibleEntry, type BibleSection } from "../api/client";
 import { keys, useBible, useChapters, useProject, useProjectBibleProposals } from "../api/hooks";
 import { BibleProposalsList } from "../components/guild/BibleProposals";
-import { Button, ConfirmDialog, Dialog, ErrorBanner, Field, Input, PageHeader, Select, Spinner, Textarea } from "../components/ui";
+import { Button, ConfirmDialog, Dialog, ErrorBanner, Field, Input, PageHeader, Pending, Select, Textarea } from "../components/ui";
 
 type FieldSpec = { key: string; label: string; multiline?: boolean; help?: string };
 type SectionSpec = { key: BibleSection; title: string; blurb: string; titleLabel: string; fields: FieldSpec[]; chapterLink?: boolean };
@@ -99,7 +99,7 @@ export default function BiblePage() {
         </section>
       )}
       <ErrorBanner error={bible.error} onRetry={() => bible.refetch()} />
-      {bible.isLoading && <Spinner />}
+      {bible.isPending && <Pending paused={bible.isPaused} />}
 
       <div className="space-y-6">
         {SECTIONS.map((spec) => {

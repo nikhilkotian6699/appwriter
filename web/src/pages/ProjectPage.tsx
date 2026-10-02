@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, call, type ChapterSummary } from "../api/client";
 import { keys, useChapters, useProject } from "../api/hooks";
-import { Button, ConfirmDialog, Dialog, EmptyState, ErrorBanner, Field, Input, PageHeader, Spinner, Textarea } from "../components/ui";
+import { Button, ConfirmDialog, Dialog, EmptyState, ErrorBanner, Field, Input, PageHeader, Pending, Textarea } from "../components/ui";
 import { timeAgo } from "../lib/format";
 
 export default function ProjectPage() {
@@ -65,9 +65,9 @@ export default function ProjectPage() {
     },
   });
 
-  if (project.isLoading) return <Spinner />;
   if (project.error) return <ErrorBanner error={project.error} onRetry={() => project.refetch()} />;
-  const p = project.data!;
+  if (!project.data) return <Pending paused={project.isPaused} />;
+  const p = project.data;
   const list = chapters.data ?? [];
 
   // Swap positions with the neighbour so both stay unique.
@@ -128,12 +128,8 @@ export default function ProjectPage() {
           </form>
         </div>
         <ErrorBanner error={createChapter.error || chapters.error || moveChapter.error} />
-        {chapters.isLoading && (
-          <div className="p-4">
-            <Spinner />
-          </div>
-        )}
-        {list.length === 0 && !chapters.isLoading && (
+        {chapters.isPending && <Pending paused={chapters.isPaused} className="p-4" />}
+        {list.length === 0 && !chapters.isPending && (
           <div className="p-4">
             <EmptyState title="No chapters yet">Add a chapter, then write or paste your text into the editor.</EmptyState>
           </div>

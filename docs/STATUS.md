@@ -26,8 +26,8 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 ## Feature branches
 
 All work happens on a `feature/*` branch; the user merges to `develop` on
-GitHub. All 23 branches were created from `develop` at `d9eb22a` on
-2026-10-01. A downstream branch must rebase onto `develop` after its upstream
+GitHub. The 24 branches descend from `develop` at `d9eb22a` (2026-10-01);
+each stacked branch was cut from the one it depends on. A downstream branch must rebase onto `develop` after its upstream
 branch is merged.
 
 | Milestone | Branch | Depends on | Status |
@@ -55,6 +55,7 @@ branch is merged.
 | 8 | `feature/account-usage` | users-and-account-pages | Pushed (awaiting merge) |
 | 8 | `feature/account-management` | users-and-account-pages | Pushed (awaiting merge) |
 | 9 | `feature/guide-screenshots` | everything else | Pushed (awaiting merge) |
+| fix | `feature/offline-guards` | guide-screenshots | Pushed (awaiting merge) |
 
 Status values: Not started · In progress · Pushed (awaiting merge) · Merged.
 
@@ -264,10 +265,22 @@ none of the stack merged when work started):
   the element was off-screen); `docker-compose.yml` passes `FAKE_DELAY_MS`
   through so runs can be slowed down to photograph them. The guide now
   renders with annotated figures; the single-file copy is about 5.6 MB.
+- `feature/offline-guards` (a fix found while checking the guide in the
+  browser) is done and pushed. A request paused because the browser was
+  offline is not "loading" in TanStack Query, so screens that took "not
+  loading" for "loaded" read data that was not there; the project page
+  threw an uncaught TypeError and React blanked the whole app. Every screen
+  now waits on its data (lists on `isPending`), shows "Offline. Waiting for
+  the network." while paused, and resumes by itself; the frame waits for
+  "who am I" the same way; a root `ErrorBoundary` shows the message with
+  Reload / Back to projects instead of a white page. Reproduced and
+  re-checked in the browser by firing the `offline` event and opening a
+  project page.
 
 Milestone 9 is complete pending merge (order: guide-content, then
 guide-screenshots) and the live gateway check. All nine milestones are
-built. Remaining for the user: merge the 22-branch stack in order, add the
+built. Remaining for the user: merge the 23-branch stack in order (the
+offline-guards fix last), add the
 real gateway credentials to `.env` for the live checks, and delete the
 throwaway `tester` account (it owns the screenshot fixtures; keep it if you
 want to recapture).

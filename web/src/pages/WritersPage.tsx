@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, call, errorMessage, type Writer, type WriterRole, type WriterTestResult } from "../api/client";
 import { keys, useGatewayModels, useMe, useWriters } from "../api/hooks";
-import { Badge, Button, ConfirmDialog, Dialog, EmptyState, ErrorBanner, Field, Input, PageHeader, Select, Spinner, Textarea } from "../components/ui";
+import { Badge, Button, ConfirmDialog, Dialog, EmptyState, ErrorBanner, Field, Input, PageHeader, Pending, Select, Spinner, Textarea } from "../components/ui";
 import { fmtCost, fmtTokens, slugify } from "../lib/format";
 
 type FormState = {
@@ -95,7 +95,7 @@ export default function WritersPage() {
         }
       />
       <ErrorBanner error={writers.error || toggle.error || duplicate.error} onRetry={writers.error ? () => writers.refetch() : undefined} />
-      {writers.isLoading && <Spinner />}
+      {writers.isPending && <Pending paused={writers.isPaused} />}
       {writers.data && guild.length === 0 && <EmptyState title="No writers yet">Add one, or duplicate a system agent's settings to start.</EmptyState>}
 
       <div className="grid gap-3 md:grid-cols-2">

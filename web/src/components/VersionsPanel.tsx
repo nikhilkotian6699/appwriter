@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, call, type Chapter, type ChapterVersion, type ChapterVersionSummary } from "../api/client";
 import { keys, useVersions } from "../api/hooks";
-import { Badge, Button, ConfirmDialog, Dialog, ErrorBanner, Input, Spinner } from "./ui";
+import { Badge, Button, ConfirmDialog, Dialog, ErrorBanner, Input, Pending } from "./ui";
 import { fmtDateTime, timeAgo, VERSION_KIND_LABELS } from "../lib/format";
 
 type Props = {
@@ -65,11 +65,7 @@ export function VersionsPanel({ chapterId, onRestored }: Props) {
           <ErrorBanner error={snapshot.error || view.error || restore.error} />
         </div>
       </div>
-      {versions.isLoading && (
-        <div className="p-4">
-          <Spinner />
-        </div>
-      )}
+      {versions.isPending && <Pending paused={versions.isPaused} className="p-4" />}
       <ul className="max-h-[70vh] divide-y divide-stone-100 overflow-y-auto">
         {versions.data?.length === 0 && <li className="px-4 py-3 text-sm text-stone-500">No snapshots yet. The first save takes one.</li>}
         {versions.data?.map((v) => (

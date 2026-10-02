@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, call, type Me } from "../api/client";
 import { keys, useMe } from "../api/hooks";
-import { Badge, Button, ErrorBanner, Field, Input, PageHeader, Spinner } from "../components/ui";
+import { Badge, Button, ErrorBanner, Field, Input, PageHeader, Pending } from "../components/ui";
 
 /** AccountPage changes the signed-in account's display name and password. */
 export default function AccountPage() {
@@ -37,8 +37,7 @@ export default function AccountPage() {
   });
   const mismatch = confirm !== "" && confirm !== next;
 
-  if (me.isLoading) return <Spinner />;
-  if (!me.data) return <ErrorBanner error={me.error} onRetry={() => me.refetch()} />;
+  if (!me.data) return me.error ? <ErrorBanner error={me.error} onRetry={() => me.refetch()} /> : <Pending paused={me.isPaused} />;
   const u = me.data.user;
   return (
     <div className="max-w-xl">

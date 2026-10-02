@@ -13,7 +13,7 @@ import { BibleKeeperSection } from "../components/guild/BibleKeeperSection";
 import { CowriteDialog, type CowriteContext } from "../components/guild/CowriteDialog";
 import { DraftSection } from "../components/guild/DraftSection";
 import { VersionsPanel } from "../components/VersionsPanel";
-import { Button, ErrorBanner, Spinner } from "../components/ui";
+import { Button, ErrorBanner, Pending } from "../components/ui";
 import { wordCount } from "../lib/format";
 
 type SaveStatus = "clean" | "dirty" | "saving" | "saved" | "conflict" | "error";
@@ -22,9 +22,9 @@ type Panel = "guild" | "history" | null;
 export default function ChapterPage() {
   const { chapterId = "" } = useParams();
   const chapter = useChapter(chapterId);
-  if (chapter.isLoading) return <Spinner />;
   if (chapter.error) return <ErrorBanner error={chapter.error} onRetry={() => chapter.refetch()} />;
-  return <ChapterWorkspace key={chapter.data!.id} initial={chapter.data!} />;
+  if (!chapter.data) return <Pending paused={chapter.isPaused} />;
+  return <ChapterWorkspace key={chapter.data.id} initial={chapter.data} />;
 }
 
 function ChapterWorkspace({ initial }: { initial: Chapter }) {

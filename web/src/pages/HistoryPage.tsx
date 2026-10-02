@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { RunHistoryItem } from "../api/client";
 import { useChapter, useChapterHistory, useRunCalls, type HistoryKind } from "../api/hooks";
-import { Badge, Button, EmptyState, ErrorBanner, PageHeader, Spinner } from "../components/ui";
+import { Badge, Button, EmptyState, ErrorBanner, PageHeader, Pending, Spinner } from "../components/ui";
 import { fmtCost, fmtDateTime, fmtDuration, fmtTokens, RUN_KIND_LABELS, timeAgo } from "../lib/format";
 
 const KINDS: HistoryKind[] = ["critique", "revision", "bible_update", "cowrite", "compare", "writer_test"];
@@ -72,8 +72,8 @@ export default function HistoryPage() {
           </Chip>
         ))}
       </div>
-      {history.isLoading && <Spinner />}
-      {!history.isLoading && items.length === 0 && (
+      {history.isPending && <Pending paused={history.isPaused} />}
+      {!history.isPending && items.length === 0 && (
         <EmptyState title={kind ? `No ${RUN_KIND_LABELS[kind].toLowerCase()} runs yet` : "No runs yet"}>Convene the Guild or ask a co-writer from the chapter page; every run lands here.</EmptyState>
       )}
       <ol className="space-y-2">
