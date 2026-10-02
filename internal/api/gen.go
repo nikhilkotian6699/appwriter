@@ -457,22 +457,46 @@ func (e WriterRole) Valid() bool {
 
 // Defines values for GetWriterStatsParamsPeriod.
 const (
-	All  GetWriterStatsParamsPeriod = "all"
-	N30d GetWriterStatsParamsPeriod = "30d"
-	N7d  GetWriterStatsParamsPeriod = "7d"
-	N90d GetWriterStatsParamsPeriod = "90d"
+	GetWriterStatsParamsPeriodAll  GetWriterStatsParamsPeriod = "all"
+	GetWriterStatsParamsPeriodN30d GetWriterStatsParamsPeriod = "30d"
+	GetWriterStatsParamsPeriodN7d  GetWriterStatsParamsPeriod = "7d"
+	GetWriterStatsParamsPeriodN90d GetWriterStatsParamsPeriod = "90d"
 )
 
 // Valid indicates whether the value is a known member of the GetWriterStatsParamsPeriod enum.
 func (e GetWriterStatsParamsPeriod) Valid() bool {
 	switch e {
-	case All:
+	case GetWriterStatsParamsPeriodAll:
 		return true
-	case N30d:
+	case GetWriterStatsParamsPeriodN30d:
 		return true
-	case N7d:
+	case GetWriterStatsParamsPeriodN7d:
 		return true
-	case N90d:
+	case GetWriterStatsParamsPeriodN90d:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetUsersUsageParamsPeriod.
+const (
+	GetUsersUsageParamsPeriodAll  GetUsersUsageParamsPeriod = "all"
+	GetUsersUsageParamsPeriodN30d GetUsersUsageParamsPeriod = "30d"
+	GetUsersUsageParamsPeriodN7d  GetUsersUsageParamsPeriod = "7d"
+	GetUsersUsageParamsPeriodN90d GetUsersUsageParamsPeriod = "90d"
+)
+
+// Valid indicates whether the value is a known member of the GetUsersUsageParamsPeriod enum.
+func (e GetUsersUsageParamsPeriod) Valid() bool {
+	switch e {
+	case GetUsersUsageParamsPeriodAll:
+		return true
+	case GetUsersUsageParamsPeriodN30d:
+		return true
+	case GetUsersUsageParamsPeriodN7d:
+		return true
+	case GetUsersUsageParamsPeriodN90d:
 		return true
 	default:
 		return false
@@ -482,6 +506,13 @@ func (e GetWriterStatsParamsPeriod) Valid() bool {
 // AccountInput defines model for AccountInput.
 type AccountInput struct {
 	DisplayName string `json:"display_name"`
+}
+
+// AccountUsage defines model for AccountUsage.
+type AccountUsage struct {
+	LastRunAt *time.Time   `json:"last_run_at,omitempty"`
+	Usage     UsageNumbers `json:"usage"`
+	User      User         `json:"user"`
 }
 
 // BibleConflict defines model for BibleConflict.
@@ -1150,9 +1181,31 @@ type SnapshotInput struct {
 	Label *string `json:"label,omitempty"`
 }
 
+// UsageNumbers defines model for UsageNumbers.
+type UsageNumbers struct {
+	Chapters         int     `json:"chapters"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	CostEstimated    bool    `json:"cost_estimated"`
+	CostUsd          float64 `json:"cost_usd"`
+	ModelCalls       int     `json:"model_calls"`
+	Projects         int     `json:"projects"`
+	PromptTokens     int64   `json:"prompt_tokens"`
+	Runs             int     `json:"runs"`
+}
+
+// UsagePage defines model for UsagePage.
+type UsagePage struct {
+	Accounts []AccountUsage `json:"accounts"`
+	Period   string         `json:"period"`
+	Totals   UsageNumbers   `json:"totals"`
+}
+
 // User defines model for User.
 type User struct {
-	CreatedAt   time.Time          `json:"created_at"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// DisabledAt Set while the account is disabled
+	DisabledAt  *time.Time         `json:"disabled_at,omitempty"`
 	DisplayName string             `json:"display_name"`
 	Id          openapi_types.UUID `json:"id"`
 	Role        UserRole           `json:"role"`
@@ -1333,6 +1386,14 @@ type GetWriterStatsParams struct {
 
 // GetWriterStatsParamsPeriod defines parameters for GetWriterStats.
 type GetWriterStatsParamsPeriod string
+
+// GetUsersUsageParams defines parameters for GetUsersUsage.
+type GetUsersUsageParams struct {
+	Period *GetUsersUsageParamsPeriod `form:"period,omitempty" json:"period,omitempty"`
+}
+
+// GetUsersUsageParamsPeriod defines parameters for GetUsersUsage.
+type GetUsersUsageParamsPeriod string
 
 // UpdateAccountJSONRequestBody defines body for UpdateAccount for application/json ContentType.
 type UpdateAccountJSONRequestBody = AccountInput
@@ -1567,6 +1628,9 @@ type ServerInterface interface {
 	// CreateUser Add an account (admins only); there is no sign-up form
 	// (POST /api/users)
 	CreateUser(w http.ResponseWriter, r *http.Request)
+	// GetUsersUsage What every account holds and used (admins only)
+	// (GET /api/users/usage)
+	GetUsersUsage(w http.ResponseWriter, r *http.Request, params GetUsersUsageParams)
 
 	// (GET /api/writers)
 	ListWriters(w http.ResponseWriter, r *http.Request)
@@ -1890,6 +1954,12 @@ func (_ Unimplemented) ListUsers(w http.ResponseWriter, r *http.Request) {
 // CreateUser Add an account (admins only); there is no sign-up form
 // (POST /api/users)
 func (_ Unimplemented) CreateUser(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetUsersUsage What every account holds and used (admins only)
+// (GET /api/users/usage)
+func (_ Unimplemented) GetUsersUsage(w http.ResponseWriter, r *http.Request, params GetUsersUsageParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3371,6 +3441,39 @@ func (siw *ServerInterfaceWrapper) CreateUser(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetUsersUsage operation middleware
+func (siw *ServerInterfaceWrapper) GetUsersUsage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetUsersUsageParams
+
+	// ------------- Optional query parameter "period" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "period", r.URL.Query(), &params.Period, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "period"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUsersUsage(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListWriters operation middleware
 func (siw *ServerInterfaceWrapper) ListWriters(w http.ResponseWriter, r *http.Request) {
 
@@ -3641,6 +3744,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/users", wrapper.CreateUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/users/usage", wrapper.GetUsersUsage)
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/account", wrapper.UpdateAccount)

@@ -4,7 +4,7 @@ Single source of truth for where the Writers' Guild build stands. Update this
 file as part of every milestone commit (see `CLAUDE.md`). When this file and
 the git history disagree, the git history wins; fix this file.
 
-Last updated: 2026-10-03 (M7 built) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
+Last updated: 2026-10-03 (M8 in progress) · `develop` at `6cd68b0` on origin (user reports the five M2 branches merged; not yet visible on origin at the time of writing)
 
 ## Milestones
 
@@ -20,7 +20,7 @@ Defined in `docs/BRIEF.md` ("Milestones") and mapped in `docs/DEVELOPMENT.md`
 | 5 | Co-writing workflow and compare mode | Built on 2 feature branches, awaiting merge | see branches |
 | 6 | Run history, cost and writer stats, settings page | Built on 2 feature branches, awaiting merge | see branches |
 | 7 | Accounts: login, sessions, workspace per user, admin adds users, isolation test | Built on 4 feature branches, awaiting merge | see branches |
-| 8 | Account management: usage per user, roles, passwords, disable, delete | Next | |
+| 8 | Account management: usage per user, roles, passwords, disable, delete | In progress (account-usage pushed) | |
 | 9 | In-app guide for new users | Not started | |
 
 ## Feature branches
@@ -52,7 +52,7 @@ branch is merged.
 | 7 | `feature/login` | auth-lib | Pushed (awaiting merge) |
 | 7 | `feature/users-and-account-pages` | login | Pushed (awaiting merge) |
 | 7 | `feature/isolation-test` | login | Pushed (awaiting merge) |
-| 8 | `feature/account-usage` | users-and-account-pages | Not started |
+| 8 | `feature/account-usage` | users-and-account-pages | Pushed (awaiting merge) |
 | 8 | `feature/account-management` | users-and-account-pages | Not started |
 | 9 | `feature/guide-screenshots` | everything else | Not started |
 
@@ -222,8 +222,15 @@ Milestone 7 is complete pending merge (order: auth-lib, login,
 users-and-account-pages, isolation-test) and the live gateway check. Note:
 the dev database now has a throwaway admin account `tester` (created
 2026-10-03 for browser checks); delete it on the Users page once M8 adds
-deletion, or leave it. Next: Milestone 8 on `feature/account-usage` and
-`feature/account-management`.
+deletion, or leave it. Milestone 8 (stacked on `feature/isolation-test`; origin still showed none of
+the stack merged when work started):
+
+- `feature/account-usage` is done and pushed: GET /api/users/usage (admins;
+  projects and chapters held now, runs, calls, tokens and cost over
+  7d/30d/90d/all with totals), `disabled_at` on the User schema, the Users
+  page shows the usage table with a period selector and totals; isolation
+  probe and integration coverage.
+- Next: `feature/account-management`.
 
 ## Open items
 

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"writersguild/internal/auth"
@@ -28,6 +30,7 @@ type authEnv struct {
 	t       *testing.T
 	pool    *pgxpool.Pool
 	q       *sqlcgen.Queries
+	tracker *runs.Tracker
 	handler http.Handler
 	limiter *auth.Limiter
 	now     time.Time
@@ -51,7 +54,7 @@ func newAuthEnv(t *testing.T) *authEnv {
 	engine := runs.NewEngine(tracker, q, 30*time.Second, logger)
 	g := guild.New(engine, q, cfg.AppName, cfg.LLMTimeout)
 	signer, _ := auth.NewSigner("integration-test-secret-that-is-long-enough-0123456789")
-	e := &authEnv{t: t, pool: pool, q: q, now: time.Now(), user: user}
+	e := &authEnv{t: t, pool: pool, q: q, tracker: tracker, now: time.Now(), user: user}
 	e.limiter = auth.NewLimiter()
 	e.limiter.Now = func() time.Time { return e.now }
 	srv := NewServer(cfg, pool, q, mock, g, engine, Auth{Signer: signer, Limiter: e.limiter, MaxAge: time.Hour}, logger)
@@ -305,5 +308,57 @@ func TestIntegrationUsersAndAccount(t *testing.T) {
 	}
 	if rec := login(newName, "second password 2"); rec.Code != 200 {
 		t.Fatalf("new password: %d %s", rec.Code, rec.Body.String())
+	}
+
+	// Usage per account: the author has nothing yet; after a run with a call,
+	// the admin sees the counts and the totals, never any text.
+	usage := func(query string) UsagePage {
+		rec := e.do("GET", "/api/users/usage"+query, "", admin.Value, "")
+		if rec.Code != 200 {
+			t.Fatalf("usage %s: %d %s", query, rec.Code, rec.Body.String())
+		}
+		var page UsagePage
+		if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+			t.Fatal(err)
+		}
+		return page
+	}
+	find := func(page UsagePage, id uuid.UUID) *AccountUsage {
+		for i := range page.Accounts {
+			if page.Accounts[i].User.Id == id {
+				return &page.Accounts[i]
+			}
+		}
+		return nil
+	}
+	before := usage("")
+	if a := find(before, author.ID); a == nil || a.Usage.Runs != 0 || a.Usage.Projects != 0 || a.LastRunAt != nil {
+		t.Fatalf("author usage before %+v", a)
+	}
+	run, err := e.tracker.Start(ctx, runs.StartParams{User: author, Kind: runs.KindWriterTest})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.q.CreateModelCall(ctx, sqlcgen.CreateModelCallParams{UserID: author.ID, RunID: uuid.NullUUID{UUID: run.Row.ID, Valid: true}, GenerationName: "test:x", ModelAlias: "lumos-chat", PromptTokens: 100, CompletionTokens: 50, CostUsd: 0.002, CostEstimated: false, Status: "ok"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.tracker.Finish(ctx, run, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"", "?period=7d"} {
+		page := usage(q)
+		a := find(page, author.ID)
+		if a == nil || a.Usage.Runs != 1 || a.Usage.ModelCalls != 1 || a.Usage.PromptTokens != 100 || a.Usage.CompletionTokens != 50 || a.Usage.CostUsd != 0.002 || a.Usage.CostEstimated || a.LastRunAt == nil {
+			t.Fatalf("author usage %s: %+v", q, a)
+		}
+		if page.Totals.Runs < 1 || page.Totals.ModelCalls < 1 || page.Totals.CostUsd < 0.002 || len(page.Accounts) < 2 {
+			t.Fatalf("usage totals %s: %+v", q, page.Totals)
+		}
+	}
+	if rec := e.do("GET", "/api/users/usage?period=2d", "", admin.Value, ""); rec.Code != 400 {
+		t.Fatalf("bad period: %d", rec.Code)
+	}
+	if rec := e.do("GET", "/api/users/usage", "", fresh.Value, ""); rec.Code != 403 {
+		t.Fatalf("author reading usage: %d", rec.Code)
 	}
 }

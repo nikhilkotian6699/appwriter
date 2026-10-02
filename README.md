@@ -126,6 +126,11 @@ to change its display name and its password: at least 8 characters, current
 password required, and a change signs the account out everywhere else while
 the browser that made it keeps a fresh session.
 
+Managing accounts (Users page, admins only): `GET /api/users/usage` shows
+what every account holds (projects, chapters) and used over the last 7, 30
+or 90 days or all time (runs, gateway calls, tokens, cost) with totals. The
+admin sees accounts and usage, never manuscripts.
+
 ### Isolation test
 
 `TestIntegrationIsolation` (in `internal/api`) walks every route of the

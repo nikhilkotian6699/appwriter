@@ -18,7 +18,7 @@ func hashContent(md string) string {
 }
 
 func toUser(u sqlcgen.User) User {
-	return User{Id: u.ID, Username: u.Username, DisplayName: u.DisplayName, Role: UserRole(u.Role), CreatedAt: u.CreatedAt}
+	return User{Id: u.ID, Username: u.Username, DisplayName: u.DisplayName, Role: UserRole(u.Role), CreatedAt: u.CreatedAt, DisabledAt: u.DisabledAt}
 }
 
 func toProject(p sqlcgen.Project) Project {

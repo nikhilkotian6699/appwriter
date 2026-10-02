@@ -70,6 +70,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What every account holds and used (admins only)
+         * @description Per account: projects and chapters held now, and runs, gateway calls,
+         *     tokens and cost over the period (last 7, 30 or 90 days, or all time),
+         *     with totals. Accounts and usage only, never manuscripts.
+         */
+        get: operations["getUsersUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account": {
         parameters: {
             query?: never;
@@ -930,6 +952,11 @@ export interface components {
             id: string;
             username: string;
             display_name: string;
+            /**
+             * Format: date-time
+             * @description Set while the account is disabled
+             */
+            disabled_at?: string;
             /** @enum {string} */
             role: "admin" | "author";
             /** Format: date-time */
@@ -1645,6 +1672,30 @@ export interface components {
             current_password: string;
             new_password: string;
         };
+        UsageNumbers: {
+            projects: number;
+            chapters: number;
+            runs: number;
+            model_calls: number;
+            /** Format: int64 */
+            prompt_tokens: number;
+            /** Format: int64 */
+            completion_tokens: number;
+            /** Format: double */
+            cost_usd: number;
+            cost_estimated: boolean;
+        };
+        AccountUsage: {
+            user: components["schemas"]["User"];
+            usage: components["schemas"]["UsageNumbers"];
+            /** Format: date-time */
+            last_run_at?: string;
+        };
+        UsagePage: {
+            period: string;
+            accounts: components["schemas"]["AccountUsage"][];
+            totals: components["schemas"]["UsageNumbers"];
+        };
     };
     responses: {
         /** @description Error */
@@ -1760,6 +1811,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["User"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getUsersUsage: {
+        parameters: {
+            query?: {
+                period?: "7d" | "30d" | "90d" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsagePage"];
                 };
             };
             default: components["responses"]["Error"];

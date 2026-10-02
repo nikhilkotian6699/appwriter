@@ -106,6 +106,7 @@ func isolationProbes(f isolationFixtures) map[string]probe {
 		"GET /api/stats/writers":    {path: "/api/stats/writers", expect: "own"},
 		"GET /api/users":            {path: "/api/users", expect: "403"},
 		"POST /api/users":           {path: "/api/users", body: UserCreateInput{Username: "intruder", Password: "first password 1", Role: "author"}, expect: "403"},
+		"GET /api/users/usage":      {path: "/api/users/usage", expect: "403"},
 		"PUT /api/account":          {path: "/api/account", body: AccountInput{DisplayName: "B"}, expect: "own"},
 		"PUT /api/account/password": {path: "/api/account/password", body: PasswordChangeInput{CurrentPassword: "x", NewPassword: "long enough 1"}, expect: "own"},
 
